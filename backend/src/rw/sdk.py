@@ -5,17 +5,23 @@ from remnawave import RemnawaveSDK
 from remnawave.exceptions.general import NotFoundError
 from remnawave.models import (
     SubscriptionInfoResponseDto,
-    SubscriptionSettingsResponseDto
+    SubscriptionSettingsResponseDto,
 )
 
 from config import settings
+from settings.service import SettingsService
 
 
-remnawave = RemnawaveSDK(
-    base_url=settings.RW_API_URL,
-    token=settings.RW_API_TOKEN,
-    caddy_token=settings.RW_CADDY_TOKEN or None,
-)
+def get_remnawave() -> RemnawaveSDK:
+    api_url, api_token, caddy_token = (
+        SettingsService.get_remnawave_credentials()
+    )
+
+    return RemnawaveSDK(
+        base_url=api_url,
+        token=api_token,
+        caddy_token=caddy_token or None,
+    )
 
 async def getAllUsers() -> GetAllUsersResponseDto:
     PAGE_SIZE = 100
@@ -24,7 +30,7 @@ async def getAllUsers() -> GetAllUsersResponseDto:
     users: list[UserResponseDto] = []
 
     while True:
-        response = await remnawave.users.get_all_users(
+        response = await get_remnawave().users.get_all_users(
             start=start,
             size=PAGE_SIZE,
         )
@@ -44,13 +50,13 @@ async def getAllUsers() -> GetAllUsersResponseDto:
 
 async def isUserValid(short_uuid: str) -> SubscriptionInfoResponseDto | None:
     try:
-        sub: GetSubscriptionInfoResponseDto = await remnawave.subscription.get_subscription_info_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
+        sub: GetSubscriptionInfoResponseDto = await get_remnawave().subscription.get_subscription_info_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
 
         if not sub.is_found:
             return None
 
         if settings.RW_SQUAD_NAME:
-            user: GetUserByShortUuidResponseDto = await remnawave.users.get_user_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
+            user: GetUserByShortUuidResponseDto = await get_remnawave().users.get_user_by_short_uuid(short_uuid)  # pyright: ignore[reportAssignmentType]
 
             for squad in user.active_internal_squads:
                 if settings.RW_SQUAD_NAME == squad.name or settings.RW_SQUAD_NAME == str(squad.uuid):
@@ -64,6 +70,6 @@ async def isUserValid(short_uuid: str) -> SubscriptionInfoResponseDto | None:
 
 
 async def getSubscriptionSettings():
-    sub: SubscriptionSettingsResponseDto = await remnawave.subscriptions_settings.get_settings()  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
+    sub: SubscriptionSettingsResponseDto = await get_remnawave().subscriptions_settings.get_settings()  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
 
     return sub

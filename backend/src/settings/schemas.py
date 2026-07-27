@@ -27,6 +27,9 @@ class RuntimeSettings(BaseModel):
     last_sync_at: datetime | None = None
     xray_routing_enabled: bool = False
     room_autogen_tokens: dict = Field(default_factory=dict)
+    rw_api_url: str = ""
+    rw_api_token_encrypted: str = ""
+    rw_caddy_token_encrypted: str = ""
 
 
     @field_validator("sub_update_interval")
@@ -45,3 +48,24 @@ class RuntimeSettings(BaseModel):
             raise ValueError("Interval must be at most 30d.")
 
         return v
+
+class RemnawaveSettingsResponse(BaseModel):
+    rw_api_url: str
+    rw_api_token_configured: bool
+    rw_caddy_token_configured: bool
+
+
+class RemnawaveSettingsUpdate(BaseModel):
+    rw_api_url: str
+    rw_api_token: str = ""
+    rw_caddy_token: str = ""
+
+
+class RemnawaveConnectionResult(BaseModel):
+    success: bool
+    message: str
+
+
+class RemnawaveTestResponse(BaseModel):
+    remnawave: RemnawaveConnectionResult
+    caddy: RemnawaveConnectionResult

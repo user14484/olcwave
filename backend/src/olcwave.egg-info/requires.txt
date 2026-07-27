@@ -1,0 +1,13 @@
+asyncpg>=0.31.0
+docker>=7.2.0
+fastapi>=0.139.2
+pydantic-settings>=2.14.2
+pyyaml>=6.0.3
+remnawave>=2.8.0
+sqlalchemy>=2.0.51
+uvicorn>=0.51.0
+PyJWT>=2.9.0
+emoji>=2.15.0
+protobuf>=7.35.1
+fake-useragent>=2.2.0
+cryptography>=44.0.0

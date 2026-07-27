@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str
 
     JWT_SECRET_KEY: str
+    SETTINGS_ENCRYPTION_KEY: str
     JWT_EXPIRE_MINUTES: int = 1440
 
     RW_SQUAD_NAME: str = ""

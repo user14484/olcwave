@@ -255,6 +255,7 @@ collect_input() {
   ask ADMIN_USERNAME "Admin username" "admin"
 
   JWT_SECRET_KEY="$(generate_secret)"
+  SETTINGS_ENCRYPTION_KEY="$(generate_secret)"
   ADMIN_PASSWORD="$(generate_secret)"
 
   ask_required PANEL_DOMAIN "OLCWave Panel domain (e.g. olcwave.example.com)"
@@ -300,6 +301,7 @@ write_backend_env() {
     printf 'ADMIN_USERNAME=%s\n'             "$ADMIN_USERNAME"
     printf 'ADMIN_PASSWORD=%s\n\n'           "$ADMIN_PASSWORD"
     printf 'JWT_SECRET_KEY=%s\n'             "$JWT_SECRET_KEY"
+    printf 'SETTINGS_ENCRYPTION_KEY=%s\n'    "$SETTINGS_ENCRYPTION_KEY"
     printf 'JWT_EXPIRE_MINUTES=1440\n\n'
     printf 'RW_SQUAD_NAME=%s\n'              "$RW_SQUAD_NAME"
   } > backend/.env

@@ -17,4 +17,5 @@ dependencies = [
     "emoji>=2.15.0",
     "protobuf>=7.35.1",
     "fake-useragent>=2.2.0",
+    "cryptography>=44.0.0",
 ]

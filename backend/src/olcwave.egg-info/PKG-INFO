@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: olcwave
+Version: 1.0.2
+Summary: Web panel for OLCRtc
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: asyncpg>=0.31.0
+Requires-Dist: docker>=7.2.0
+Requires-Dist: fastapi>=0.139.2
+Requires-Dist: pydantic-settings>=2.14.2
+Requires-Dist: pyyaml>=6.0.3
+Requires-Dist: remnawave>=2.8.0
+Requires-Dist: sqlalchemy>=2.0.51
+Requires-Dist: uvicorn>=0.51.0
+Requires-Dist: PyJWT>=2.9.0
+Requires-Dist: emoji>=2.15.0
+Requires-Dist: protobuf>=7.35.1
+Requires-Dist: fake-useragent>=2.2.0
+Requires-Dist: cryptography>=44.0.0
