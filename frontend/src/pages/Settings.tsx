@@ -274,7 +274,7 @@ export default function Settings() {
                             loading={saveMutation.isPending}
                             disabled={isLoading || !!subIntervalError}
                         >
-                            {t('saveSettings')}
+                            Сохранить
                         </Button>
                     </div>
                 </div>
@@ -350,28 +350,25 @@ export default function Settings() {
                             variant="secondary"
                             onClick={handleTestRemnawave}
                             loading={testRemnawaveMutation.isPending}
-                            disabled={isRemnawaveLoading || !rwApiUrl}
+                            disabled={
+                                isRemnawaveLoading ||
+                                saveRemnawaveMutation.isPending ||
+                                !rwApiUrl
+                            }
                         >
                             Проверить подключение
                         </Button>
 
                         <Button
-                            onClick={() => {
-                                handleSave()
-                                handleSaveRemnawave()
-                            }}
-                            loading={
-                                saveMutation.isPending ||
-                                saveRemnawaveMutation.isPending
-                            }
+                            onClick={handleSaveRemnawave}
+                            loading={saveRemnawaveMutation.isPending}
                             disabled={
-                                isLoading ||
                                 isRemnawaveLoading ||
-                                !!syncError ||
+                                testRemnawaveMutation.isPending ||
                                 !rwApiUrl
                             }
                         >
-                            Сохранить настройки
+                            Сохранить подключение
                         </Button>
                     </div>
                 </div>
