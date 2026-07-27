@@ -268,33 +268,13 @@ export default function Settings() {
                         hint={t('trafficCollectHint')}
                         disabled={isLoading}
                     />
-                    <div className="flex justify-end gap-2 pt-1">
+                    <div className="flex justify-end pt-1">
                         <Button
-                            variant="secondary"
-                            onClick={handleTestRemnawave}
-                            loading={testRemnawaveMutation.isPending}
-                            disabled={isRemnawaveLoading || !rwApiUrl}
+                            onClick={handleSave}
+                            loading={saveMutation.isPending}
+                            disabled={isLoading || !!subIntervalError}
                         >
-                            Проверить подключение
-                        </Button>
-
-                        <Button
-                            onClick={() => {
-                                handleSave()
-                                handleSaveRemnawave()
-                            }}
-                            loading={
-                                saveMutation.isPending ||
-                                saveRemnawaveMutation.isPending
-                            }
-                            disabled={
-                                isLoading ||
-                                isRemnawaveLoading ||
-                                !!syncError ||
-                                !rwApiUrl
-                            }
-                        >
-                            Сохранить
+                            {t('saveSettings')}
                         </Button>
                     </div>
                 </div>
@@ -365,13 +345,33 @@ export default function Settings() {
                         <span className="text-xs text-text-muted">{t('lastSync')}</span>
                         <span className="text-xs text-text-primary tabular-nums">{formatDatetime(lastSyncAt)}</span>
                     </div>
-                    <div className="flex justify-end pt-1">
+                    <div className="flex justify-end gap-2 pt-1">
                         <Button
-                            onClick={handleSave}
-                            loading={saveMutation.isPending}
-                            disabled={isLoading || !!syncError}
+                            variant="secondary"
+                            onClick={handleTestRemnawave}
+                            loading={testRemnawaveMutation.isPending}
+                            disabled={isRemnawaveLoading || !rwApiUrl}
                         >
-                            {t('saveSettings')}
+                            Проверить подключение
+                        </Button>
+
+                        <Button
+                            onClick={() => {
+                                handleSave()
+                                handleSaveRemnawave()
+                            }}
+                            loading={
+                                saveMutation.isPending ||
+                                saveRemnawaveMutation.isPending
+                            }
+                            disabled={
+                                isLoading ||
+                                isRemnawaveLoading ||
+                                !!syncError ||
+                                !rwApiUrl
+                            }
+                        >
+                            Сохранить настройки
                         </Button>
                     </div>
                 </div>
