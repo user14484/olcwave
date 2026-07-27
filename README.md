@@ -27,7 +27,7 @@ OLCWave хранит шаблоны конфигураций OLCRTC (`profiles`)
 
 ```bash
 cd /opt
-git clone https://github.com/invdevv/olcwave.git && cd olcwave
+git clone https://github.com/user14484/olcwave.git && cd olcwave
 
 chmod +x install.sh
 ./install.sh
