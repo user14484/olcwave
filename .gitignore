@@ -7,3 +7,4 @@ temp.txt
 .ruff_cache
 pyrightconfig.json
 TODO
+/.vs
