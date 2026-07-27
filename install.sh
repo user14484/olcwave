@@ -356,7 +356,29 @@ build_frontend() {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Start the Docker Compose stack
+# 5. Build the subscription Page  (Caddy serves subscriptionPage/dist)
+# ---------------------------------------------------------------------------
+build_subscription_page() {
+  info "Building the subscription page..."
+  (
+    cd subscriptionPage
+    if [ -d node_modules ]; then
+      info "node_modules present - skipping dependency install."
+    else
+      info "Installing dependencies (npm ci)..."
+      if [ -f package-lock.json ]; then
+        npm ci
+      else
+        npm install
+      fi
+    fi
+    npm run build
+  )
+  success "subscriptionPage built into subscriptionPage/dist."
+}
+
+# ---------------------------------------------------------------------------
+# 6. Start the Docker Compose stack
 # ---------------------------------------------------------------------------
 start_stack() {
   info "Building images and starting the stack (docker compose up -d --build)..."
@@ -364,7 +386,7 @@ start_stack() {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Verify the API container came up
+# 7. Verify the API container came up
 # ---------------------------------------------------------------------------
 verify_stack() {
   info "Waiting for the API container to start..."
@@ -388,7 +410,7 @@ verify_stack() {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Final summary
+# 8. Final summary
 # ---------------------------------------------------------------------------
 print_summary() {
   local line="========================================"
@@ -416,6 +438,7 @@ main() {
   write_frontend_env
   write_caddyfile
   build_frontend
+  build_subscription_page
   build_olcrtc
   build_xraycore
   start_stack

@@ -228,12 +228,12 @@ class Subscriptions:
         }
 
         for tag, config in configs.items():
-            config_json = json.loads(config)
-            if config_json["auth"]["provider"] in ("telemost", "wbstream"):
+            config_obj = yaml.safe_load(config)
+            if config_obj["auth"]["provider"] in ("telemost", "wbstream"):
                 room_exists = await RoomChecker.check_room_id(
-                    config_json["auth"]["provider"],
-                    config_json["room"]["id"],
-                    config_json["auth"].get("token", ""),
+                    config_obj["auth"]["provider"],
+                    config_obj["room"]["id"],
+                    config_obj["auth"].get("token", ""),
                 )
 
                 if not room_exists:

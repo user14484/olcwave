@@ -1,0 +1,444 @@
+import { useState, useEffect, type ReactNode } from 'react'
+import { useLanguage, type SupportedLanguage } from './i18n/useLanguage'
+import {
+  ArrowDownTrayIcon,
+  LinkIcon,
+  ClipboardDocumentIcon,
+  LightBulbIcon,
+  CheckCircleIcon,
+  NoSymbolIcon,
+  ChevronDownIcon,
+} from '@heroicons/react/24/outline'
+import AndroidSvg from './assets/icons/android.svg?react'
+import WindowsSvg from './assets/icons/windows.svg?react'
+import LinuxSvg from './assets/icons/linux.svg?react'
+
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+function useIOSCheck() {
+  const [detected, setDetected] = useState(false)
+  useEffect(() => { setDetected(isIOS()) }, [])
+  return detected
+}
+
+type Platform = 'android' | 'windows' | 'linux'
+
+function detectPlatform(): Platform | null {
+  if (typeof navigator === 'undefined') return null
+  const ua = navigator.userAgent.toLowerCase()
+  if (/android/.test(ua)) return 'android'
+  if (/win/.test(ua)) return 'windows'
+  if (/linux/.test(ua)) return 'linux'
+  if (/mac/.test(ua)) return 'linux'
+  return null
+}
+
+function usePlatform() {
+  const [platform, setPlatform] = useState<Platform | null>(null)
+  useEffect(() => { setPlatform(detectPlatform()) }, [])
+  return platform
+}
+
+function useToast() {
+  const [message, setMessage] = useState<string | null>(null)
+  const show = (msg: string) => {
+    setMessage(msg)
+    setTimeout(() => setMessage(null), 2500)
+  }
+  return { message, show }
+}
+
+function useCurrentUrl() {
+  const [url, setUrl] = useState('')
+  useEffect(() => { setUrl(window.location.href) }, [])
+  return url
+}
+
+function useSubId(): string | null {
+  if (typeof window === 'undefined') return null
+  const match = window.location.pathname.match(/^\/([^/]+)/)
+  return match ? match[1] : null
+}
+
+function useProviderName(): string | null {
+  const subId = useSubId()
+  const [name, setName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!subId) return
+    fetch(`/${subId}/raw`)
+      .then((r) => r.ok ? r.text() : null)
+      .then((text) => {
+        if (!text) return
+        const firstLine = text.split('\n')[0]
+        const m = firstLine.match(/^#name:\s*(.+)$/)
+        if (m) setName(m[1].trim())
+      })
+      .catch(() => {})
+  }, [subId])
+
+  return name
+}
+
+export default function App() {
+  const ios = useIOSCheck()
+  const toast = useToast()
+  const currentUrl = useCurrentUrl()
+  const [showMain, setShowMain] = useState(false)
+
+  if (ios && !showMain) {
+    return <IosOverlay onShowMain={() => setShowMain(true)} />
+  }
+
+  return (
+    <div className="min-h-screen">
+      <LanguageSwitcher />
+      <Hero />
+      <main className="max-w-3xl mx-auto px-5 pb-16 space-y-6">
+        <DownloadSection />
+        <SubscribeSection url={currentUrl} showToast={toast.show} />
+        <TipsSection />
+      </main>
+      <Footer />
+      <Toast message={toast.message} />
+    </div>
+  )
+}
+
+/* ─── Language Switcher ─── */
+
+function LanguageSwitcher() {
+  const { language, setLanguage } = useLanguage()
+  const langs: SupportedLanguage[] = ['en', 'ru']
+
+  return (
+    <div className="fixed top-4 right-4 z-40 flex rounded-lg bg-bg-secondary border border-border shadow-soft overflow-hidden">
+      {langs.map((lang) => (
+        <button
+          key={lang}
+          onClick={() => setLanguage(lang)}
+          className={`px-3 h-8 text-xs font-semibold transition-colors cursor-pointer
+            ${language === lang
+              ? 'bg-accent text-white'
+              : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'}`}
+        >
+          {lang.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* ─── iOS Overlay ─── */
+
+function IosOverlay({ onShowMain }: { onShowMain: () => void }) {
+  const { t } = useLanguage()
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-primary">
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(1200px 600px at 100% -10%, rgba(99, 102, 241, 0.08), transparent 60%)',
+        }}
+      />
+      <div className="relative z-10 max-w-sm w-full mx-5 animate-scale-in">
+        <div className="bg-bg-secondary border border-border rounded-xl shadow-elevated p-8 text-center space-y-5">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-full bg-danger/10">
+            <NoSymbolIcon className="w-8 h-8 text-danger" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-text-primary">{t('iosTitle')}</h2>
+            <p className="text-sm text-text-secondary leading-relaxed">{t('iosDesc')}</p>
+          </div>
+          <button
+            onClick={onShowMain}
+            className="w-full h-11 rounded-lg font-medium text-sm bg-bg-tertiary border border-border
+              text-text-secondary hover:text-text-primary hover:bg-bg-hover hover:border-border-light
+              transition-all duration-150 cursor-pointer active:scale-[0.98]"
+          >
+            {t('iosButton')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Toast ─── */
+
+function Toast({ message }: { message: string | null }) {
+  if (!message) return null
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast-in">
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success/15 border border-success/30
+        text-sm font-medium text-success shadow-elevated backdrop-blur-sm">
+        <CheckCircleIcon className="w-4 h-4 shrink-0" />
+        {message}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Hero ─── */
+
+function Hero() {
+  const { t } = useLanguage()
+  const providerName = useProviderName()
+  return (
+    <header className="relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(800px 400px at 50% 0%, rgba(88, 166, 255, 0.06), transparent 70%)',
+        }}
+      />
+      <div className="relative max-w-3xl mx-auto px-5 pt-14 pb-10 text-center space-y-5 animate-fade-in">
+        <div className="flex items-center justify-center w-14 h-14 mx-auto rounded-2xl bg-accent/10 shadow-glow">
+          <WavesIcon className="w-7 h-7 text-accent" />
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-text-primary">
+          {providerName || 'OLCWave'}
+        </h1>
+        <p className="text-base sm:text-lg text-text-secondary leading-relaxed max-w-lg mx-auto">
+          {t('heroSubtitle')}
+        </p>
+      </div>
+    </header>
+  )
+}
+
+/* ─── Download Section ─── */
+
+const PLATFORMS = [
+  { key: 'android' as Platform, href: 'https://github.com/alananisimov/olcbox/releases/download/nightly/Olcbox-1.0.117-android-release.apk' },
+  { key: 'windows' as Platform, href: 'https://github.com/alananisimov/olcbox/releases/download/nightly/Olcbox-1.0.117-windows-amd64.exe' },
+  { key: 'linux' as Platform, href: 'https://github.com/alananisimov/olcbox/releases/download/nightly/Olcbox-1.0.117-linux-amd64.AppImage' },
+]
+
+const PLATFORM_ICONS: Record<Platform, ReactNode> = {
+  android: <AndroidIcon className="w-5 h-5" />,
+  windows: <WindowsIcon className="w-5 h-5" />,
+  linux: <LinuxIcon className="w-5 h-5" />,
+}
+
+function DownloadSection() {
+  const { t } = useLanguage()
+  const detected = usePlatform()
+  const [selected, setSelected] = useState<Platform>(detected ?? 'android')
+
+  useEffect(() => { if (detected) setSelected(detected) }, [detected])
+
+  const current = PLATFORMS.find((p) => p.key === selected)!
+
+  return (
+    <Section title={t('downloadTitle')} icon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+      <div className="space-y-4">
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {t('downloadDesc')}
+        </p>
+
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value as Platform)}
+              className="appearance-none h-11 pl-10 pr-8 rounded-lg bg-bg-tertiary border border-border
+                text-sm font-medium text-text-primary cursor-pointer
+                hover:border-border-light focus:outline-none focus:border-accent/50 transition-colors"
+            >
+              {PLATFORMS.map((p) => (
+                <option key={p.key} value={p.key}>{t(p.key)}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-accent">
+              {PLATFORM_ICONS[selected]}
+            </span>
+            <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          </div>
+
+          <a
+            href={current.href}
+            className="flex-1 h-11 flex items-center justify-center gap-2 rounded-lg font-medium text-sm
+              bg-accent text-white shadow-soft hover:bg-accent-hover
+              transition-all duration-150 no-underline active:scale-[0.98]"
+          >
+            <ArrowDownTrayIcon className="w-4 h-4" />
+            {t('download')}
+          </a>
+        </div>
+
+        <p className="text-xs text-text-muted">
+          {t('iosComingSoon')}
+        </p>
+      </div>
+    </Section>
+  )
+}
+
+/* ─── Subscribe Section ─── */
+
+function SubscribeSection({ url, showToast }: { url: string; showToast: (msg: string) => void }) {
+  const { t } = useLanguage()
+  const copyUrl = () => {
+    navigator.clipboard.writeText(url).then(() => showToast(t('linkCopied')))
+  }
+
+  return (
+    <Section title={t('subscribeTitle')} icon={<LinkIcon className="w-4 h-4" />}>
+      <div className="space-y-4">
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {t('subscribeDesc')}
+        </p>
+
+        <Step number={1} title={t('step1')} />
+        <Step number={2} title={t('step2')} />
+        <Step number={3} title={t('step3')} />
+
+        <div className="bg-bg-tertiary border border-border rounded-xl p-4 space-y-3">
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider">{t('yourLink')}</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-accent font-mono break-all leading-relaxed bg-bg-primary/50
+              rounded-lg px-3 py-2.5 border border-border">
+              {url || t('loading')}
+            </code>
+            <button
+              onClick={copyUrl}
+              disabled={!url}
+              className="shrink-0 h-10 px-3.5 rounded-lg text-xs font-medium
+                bg-accent text-white shadow-soft hover:bg-accent-hover
+                transition-all duration-150 cursor-pointer active:scale-[0.98]
+                disabled:opacity-40 disabled:pointer-events-none
+                flex items-center gap-1.5"
+            >
+              <ClipboardDocumentIcon className="w-3.5 h-3.5" />
+              {t('copy')}
+            </button>
+          </div>
+          <p className="text-xs text-text-muted">
+            {t('copyHint')}
+          </p>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+/* ─── Tips Section ─── */
+
+function TipsSection() {
+  const { t } = useLanguage()
+  return (
+    <Section title={t('tipsTitle')} icon={<LightBulbIcon className="w-4 h-4" />}>
+      <div className="space-y-3">
+        <Tip
+          title={t('tipSubNotLoading')}
+          text={t('tipSubNotLoadingText')}
+        />
+        <Tip
+          title={t('tipSlow')}
+          text={t('tipSlowText')}
+        />
+        <Tip
+          title={t('tipExpired')}
+          text={t('tipExpiredText')}
+        />
+        <Tip
+          title={t('tipHelp')}
+          text={t('tipHelpText')}
+        />
+      </div>
+    </Section>
+  )
+}
+
+/* ─── Footer ─── */
+
+function Footer() {
+  const { t } = useLanguage()
+  const providerName = useProviderName()
+  return (
+    <footer className="border-t border-border">
+      <div className="max-w-3xl mx-auto px-5 py-8 text-center space-y-2">
+        <div className="flex items-center justify-center gap-2 text-text-muted">
+          <WavesIcon className="w-4 h-4" />
+          <span className="text-xs font-medium">{providerName || 'OLCWave'}</span>
+        </div>
+        <p className="text-xs text-text-muted">
+          {t('footerTagline')}
+        </p>
+      </div>
+    </footer>
+  )
+}
+
+/* ─── Shared building blocks ─── */
+
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string
+  icon?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="bg-bg-secondary border border-border rounded-xl shadow-soft overflow-hidden animate-fade-in">
+      <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+        {icon && <span className="text-text-muted">{icon}</span>}
+        <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">{title}</h2>
+      </div>
+      <div className="p-5">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function Step({ number, title }: { number: number; title: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center w-7 h-7 rounded-full bg-accent/10 text-accent
+        text-xs font-bold shrink-0">
+        {number}
+      </div>
+      <p className="text-sm text-text-primary">{title}</p>
+    </div>
+  )
+}
+
+function Tip({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="p-3.5 rounded-lg bg-bg-tertiary border border-border">
+      <p className="text-sm font-medium text-text-primary">{title}</p>
+      <p className="text-xs text-text-secondary mt-1 leading-relaxed">{text}</p>
+    </div>
+  )
+}
+
+/* ─── Icons ─── */
+
+function WavesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M3 8c1.5 0 2.5-1.5 4.5-1.5S10.5 8 12 8s3-1.5 5-1.5S19.5 8 21 8M3 12c1.5 0 2.5-1.5 4.5-1.5S10.5 12 12 12s3-1.5 5-1.5S19.5 12 21 12M3 16c1.5 0 2.5-1.5 4.5-1.5S10.5 16 12 16s3-1.5 5-1.5S19.5 16 21 16" />
+    </svg>
+  )
+}
+
+function AndroidIcon({ className }: { className?: string }) {
+  return <AndroidSvg className={className} />
+}
+
+function WindowsIcon({ className }: { className?: string }) {
+  return <WindowsSvg className={className} />
+}
+
+function LinuxIcon({ className }: { className?: string }) {
+  return <LinuxSvg className={className} />
+}

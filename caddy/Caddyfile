@@ -12,6 +12,21 @@ olcwave.example.org {
 
 
 olcsub.example.org {
+    @raw path_regexp raw ^/(?P<id>[^/]+)/raw$
+
+    handle @raw {
+        rewrite * /sub/{re.id}
+        reverse_proxy api:8000
+    }
+
+    @browser header_regexp browser User-Agent (?i)^Mozilla/
+
+    handle @browser {
+        root * /srv/subscriptionPage/dist
+        try_files {path} /index.html
+        file_server
+    }
+
     handle {
         rewrite * /sub{uri}
         reverse_proxy api:8000

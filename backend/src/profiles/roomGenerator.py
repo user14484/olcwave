@@ -103,7 +103,7 @@ class RoomChecker:
 
         async with httpx.AsyncClient() as client:
             res = await client.post(
-                url = f"https://stream.wb.ru/api-room/api/v2/room/{room_id}",
+                url = f"https://stream.wb.ru/api-room/api/v1/room/{room_id}",
                 headers=headers,
             )
 
@@ -128,5 +128,4 @@ class RoomChecker:
                 json = {}
             )
         
-        print(res.json()["uri"].split("/")[-1])
-        return res.json()["uri"].split("/")[-1]
+        return "Такой встречи не существует" in res.text
