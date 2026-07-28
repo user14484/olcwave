@@ -31,7 +31,7 @@ def format_connection_error(exc: Exception) -> str:
     if "connect" in message or "connection" in message:
         return "Не удалось подключиться к Remnawave."
 
-    return "Не удалось проверить подключение."ё
+    return "Не удалось проверить подключение."
 
 @router.get("/")
 async def get_settings(_admin: dict = Depends(get_current_admin)):
