@@ -239,14 +239,8 @@ build_node_project() {
   info "Сборка $title..."
   (
     cd "$directory"
-    
-    # Оставляем только npm install для надежности
     npm install
-    
     npm run build
-    
-    # Откатываем изменения в lock-файле сразу после сборки, чтобы Git не ругался при следующем обновлении
-    git checkout -- package-lock.json 2>/dev/null || true
   )
 }
 
