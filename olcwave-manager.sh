@@ -267,7 +267,7 @@ update_panel() {
     echo -e "   ${C_WHITE}0)${C_RESET} Отменить обновление"
     echo
 
-    read -rp "$(echo -e "${C_WHITE}Выберите действие [1-3]: ${C_RESET}")" action
+    read -rp "$(echo -e "${C_WHITE}Выберите действие [1-2]: ${C_RESET}")" action
 
     case "$action" in
       1)
