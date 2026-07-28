@@ -4,7 +4,7 @@
 #
 
 # Версия менеджера. Меняй её здесь для вызова обновлений.
-MANAGER_VERSION="1.2.0"
+MANAGER_VERSION="1.2.1"
 
 set -Eeuo pipefail
 
