@@ -15,6 +15,9 @@ set -euo pipefail
 # Always operate from the repo root (the directory this script lives in).
 cd "$(dirname "$0")"
 
+# Файл для сохранения промежуточного состояния (доменов, паролей)
+STATE_FILE=".installer_state.env"
+
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
@@ -34,11 +37,9 @@ error()   { printf '%s[x]%s %s\n' "$C_RED"    "$C_RESET" "$1" >&2; }
 die() { error "$1"; exit 1; }
 
 # ---------------------------------------------------------------------------
-# Input helpers  (all read from /dev/tty so the script also works when piped)
+# Input helpers
 # ---------------------------------------------------------------------------
 
-# ask VAR "Prompt" ["default"]
-# Reads a line into VAR. Falls back to the default when the input is empty.
 ask() {
   local __var="$1" __msg="$2" __def="${3:-}" __in
   if [ -n "$__def" ]; then
@@ -50,7 +51,6 @@ ask() {
   printf -v "$__var" '%s' "${__in:-$__def}"
 }
 
-# ask_required VAR "Prompt" - like ask, but keeps asking until non-empty.
 ask_required() {
   local __var="$1" __msg="$2"
   while :; do
@@ -60,7 +60,6 @@ ask_required() {
   done
 }
 
-# ask_secret VAR "Prompt" - hidden input, keeps asking until non-empty.
 ask_secret() {
   local __var="$1" __msg="$2" __in
   while :; do
@@ -75,7 +74,6 @@ ask_secret() {
   done
 }
 
-# confirm "Question" - returns 0 for yes (default), 1 for no.
 confirm() {
   local __ans
   printf '%s%s%s [Y/n]: ' "$C_BOLD" "$1" "$C_RESET" > /dev/tty
@@ -86,7 +84,6 @@ confirm() {
   esac
 }
 
-# Generate a cryptographically random hex secret (32 bytes → 64 hex chars).
 generate_secret() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -101,6 +98,31 @@ require_root() {
   if [ "$(id -u)" -ne 0 ]; then
     die "Please run this script as root."
   fi
+}
+
+# ---------------------------------------------------------------------------
+# Обертка для команд Docker, перехватывающая ошибки (например, Rate Limit)
+# ---------------------------------------------------------------------------
+docker_retry() {
+  while true; do
+    # Отключаем 'set -e' временно для этой команды, чтобы скрипт не упал
+    set +e
+    "$@"
+    local status=$?
+    set -e
+
+    if [ $status -eq 0 ]; then
+      return 0
+    else
+      warn "Ошибка при выполнении: $*"
+      if confirm "Возможно, превышен лимит Docker Hub (Rate Limit 429). Выполнить docker login и повторить?"; then
+        docker login
+        info "Повторяем команду..."
+      else
+        die "Сборка прервана."
+      fi
+    fi
+  done
 }
 
 install_base_packages() {
@@ -120,7 +142,8 @@ build_olcrtc(){
   info "Building OLCRTC container"
   cd backend/olcrtc
 
-  docker build . --tag olcrtc
+  # Используем обертку docker_retry
+  docker_retry docker build . --tag olcrtc
 
   cd ../..
 }
@@ -129,10 +152,12 @@ build_xraycore(){
   info "Building XrayCore container"
   cd backend/xraycore
 
-  docker build . --tag xraycore
+  # Используем обертку docker_retry
+  docker_retry docker build . --tag xraycore
 
   docker run -d --name olcwave-xraycore xraycore
   docker stop olcwave-xraycore
+  docker rm olcwave-xraycore >/dev/null 2>&1 || true
 
   cd ../..
 }
@@ -191,9 +216,6 @@ enable_swapfile() {
     free -h
 }
 
-# ---------------------------------------------------------------------------
-# 1. Dependency checks and installs
-# ---------------------------------------------------------------------------
 install_docker() {
   info "Installing Docker..."
 
@@ -255,6 +277,19 @@ check_dependencies() {
 # 2. Collect configuration from the user
 # ---------------------------------------------------------------------------
 collect_input() {
+  # Проверка на наличие сохраненных данных
+  if [ -f "$STATE_FILE" ]; then
+    info "Найдены данные от предыдущей установки."
+    if confirm "Использовать сохраненные данные и продолжить?"; then
+      source "$STATE_FILE"
+      success "Сохраненные данные загружены. Пропускаем ввод настроек."
+      return 0
+    else
+      info "Начинаем конфигурацию заново."
+      rm -f "$STATE_FILE"
+    fi
+  fi
+
   info "Configuration - answer the prompts below."
   printf '\n' > /dev/tty
 
@@ -289,13 +324,34 @@ collect_input() {
   POSTGRES_USER="olcwave"
   POSTGRES_DB="main"
   POSTGRES_PASSWORD="$(generate_secret)"
+
+  # Сохраняем введенные данные в файл для возможности восстановления
+  cat <<EOF > "$STATE_FILE"
+RW_DOMAIN="${RW_DOMAIN}"
+RW_API_URL="${RW_API_URL}"
+RW_API_TOKEN="${RW_API_TOKEN}"
+RW_CADDY_TOKEN="${RW_CADDY_TOKEN}"
+ADMIN_USERNAME="${ADMIN_USERNAME}"
+JWT_SECRET_KEY="${JWT_SECRET_KEY}"
+SETTINGS_ENCRYPTION_KEY="${SETTINGS_ENCRYPTION_KEY}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD}"
+PANEL_DOMAIN="${PANEL_DOMAIN}"
+PANEL_URL="${PANEL_URL}"
+VITE_API_URL="${VITE_API_URL}"
+ROOT_DOMAIN="${ROOT_DOMAIN}"
+SUB_DOMAIN="${SUB_DOMAIN}"
+SUB_URL_TEMPLATE="${SUB_URL_TEMPLATE}"
+RW_SQUAD_NAME="${RW_SQUAD_NAME}"
+POSTGRES_USER="${POSTGRES_USER}"
+POSTGRES_DB="${POSTGRES_DB}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+EOF
 }
 
 # ---------------------------------------------------------------------------
 # 3. Generate env files
 # ---------------------------------------------------------------------------
 
-# Warn + confirm before clobbering an existing file. Returns 1 to skip.
 may_overwrite() {
   local target="$1"
   [ -f "$target" ] || return 0
@@ -305,7 +361,6 @@ may_overwrite() {
 
 write_backend_env() {
   may_overwrite "backend/.env" || return 0
-  # printf '%s' keeps values verbatim (safe for passwords with special chars).
   {
     printf 'RW_API_URL=%s\n'                 "$RW_API_URL"
     printf 'RW_API_TOKEN=%s\n'               "$RW_API_TOKEN"
@@ -353,7 +408,7 @@ write_caddyfile() {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Build the frontend  (Caddy serves frontend/dist)
+# 4. Build the frontend
 # ---------------------------------------------------------------------------
 build_frontend() {
   info "Building the frontend..."
@@ -375,7 +430,7 @@ build_frontend() {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Build the subscription Page  (Caddy serves subscriptionPage/dist)
+# 5. Build the subscription Page
 # ---------------------------------------------------------------------------
 build_subscription_page() {
   info "Building the subscription page..."
@@ -401,7 +456,8 @@ build_subscription_page() {
 # ---------------------------------------------------------------------------
 start_stack() {
   info "Building images and starting the stack (docker compose up -d --build)..."
-  docker compose up -d --build
+  # Обернуто в docker_retry на случай rate limit при скачивании базовых образов (Postgres, Python и др.)
+  docker_retry docker compose up -d --build
 }
 
 # ---------------------------------------------------------------------------
@@ -410,7 +466,6 @@ start_stack() {
 verify_stack() {
   info "Waiting for the API container to start..."
   local running="" i
-  # The API waits for Postgres to become healthy, so give it a little time.
   for i in $(seq 1 20); do
     running="$(docker inspect -f '{{.State.Running}}' olcwave-api 2>/dev/null || echo false)"
     [ "$running" = "true" ] && break
@@ -453,6 +508,9 @@ install_manager() {
 # 9. Final summary
 # ---------------------------------------------------------------------------
 print_summary() {
+  # Удаляем файл состояния, если установка прошла успешно
+  rm -f "$STATE_FILE"
+
   local line="========================================"
   printf '\n%s%s%s\n\n' "$C_GREEN" "$line" "$C_RESET"
   printf '  %sOLCWave%s installed successfully%s\n\n' "$C_BOLD" "$C_GREEN" "$C_RESET"
