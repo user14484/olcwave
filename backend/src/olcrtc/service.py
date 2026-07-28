@@ -2,7 +2,7 @@ from docker.models.containers import Container
 from fastapi import HTTPException
 
 from routing.service import Routing
-from settings.service import SettingsService
+from xraycore.sdk import XrayCore
 from olcrtc.sdk import OlcRTC
 from olcrtc.schemas import ContainerSchema, ContainerConfigSchema, ContainerLogsSchema, ContainerStatsSchema
 
@@ -40,7 +40,7 @@ class Containers:
     @staticmethod
     def run(config: str, config_tag: str, short_uuid: str):
         routing_socks_addr = ""
-        if SettingsService.get().xray_routing_enabled:
+        if XrayCore.is_running():
             routing_socks_addr = f"host.docker.internal:10808"
 
         OlcRTC.run(config, config_tag, short_uuid, routing_socks_addr)

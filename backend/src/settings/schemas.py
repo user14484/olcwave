@@ -25,7 +25,6 @@ class RuntimeSettings(BaseModel):
     traffic_collect_interval: int = 10
     sync_interval: str = "4h"
     last_sync_at: datetime | None = None
-    xray_routing_enabled: bool = False
     room_autogen_tokens: dict = Field(default_factory=dict)
     rw_api_url: str = ""
     rw_api_token_encrypted: str = ""

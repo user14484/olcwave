@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, HTTPException
 
 from auth.dependencies import get_current_admin
 from settings.service import SettingsService
@@ -9,7 +9,12 @@ router = APIRouter(prefix="/routing", tags=["routing"])
 
 @router.get("/enabled")
 async def check_enabled(_admin: dict = Depends(get_current_admin)):
-    return SettingsService.get().xray_routing_enabled
+    try:
+        await Routing.get() # if enabled -> record in db exists -> True; if not error 404
+    except HTTPException:
+        return False
+        
+    return True
 
 @router.get("/config")
 async def get(_admin: dict = Depends(get_current_admin)):

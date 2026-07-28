@@ -197,4 +197,43 @@ olcsub.example.org {
 * **HTTPS / certificates / SSL** - Caddy автоматически получает и обновляет сертификаты Let's Encrypt для любого настроенного реального домена. Compose-файл публикует порты **80** и **443**, которые ему необходимы; DNS домена должен указывать на сервер.
 * **SPA routing** - `try_files {path} /index.html` позволяет клиентским маршрутам (например `/users`) загружать SPA вместо получения ошибки 404.
 
+### Маршрутизация на подписочном домене
+
+Подписочный домен (`olcsub.example.org`) обрабатывает три типа запросов:
+
+```caddyfile
+olcsub.example.org {
+    @raw path_regexp raw ^/(?P<id>[^/]+)/raw$
+    handle @raw {
+        rewrite * /sub/{re.id}
+        reverse_proxy api:8000
+    }
+
+    @browser header_regexp browser User-Agent (?i)^Mozilla/
+    handle @browser {
+        root * /srv/subscriptionPage/dist
+        try_files {path} /index.html
+        file_server
+    }
+
+    handle {
+        rewrite * /sub{uri}
+        reverse_proxy api:8000
+    }
+}
+```
+
+1. **`/{uuid}/raw`** — прямой доступ к raw-тексту подписки. Caddy реврайтит на `/sub/{uuid}` и проксирует в API
+2. **`/{uuid}` с User-Agent `Mozilla/...`** — браузерный запрос. Caddy отдаёт статику `subscriptionPage/dist` (HTML-страница с инструкциями по установке). SPA-роутинг обеспечивается через `try_files`.
+3. **`/{uuid}` без `Mozilla/`** — клиентский запрос (OLCBox). Реврайт на `/sub{uri}` и проксирование в API, возвращающий raw-подписку.
+
+Статика subscription page монтируется в контейнер Caddy:
+
+```yaml
+volumes:
+  - ./subscriptionPage/dist:/srv/subscriptionPage:ro
+```
+
+Подробнее о subscription page см. [subscription_page.md](subscription_page.md).
+
 Для локальной настройки без сертификатов используйте обычный site block с портом (например, `:80 { ... }`) вместо домена, и Caddy будет обслуживать HTTP без сертификатов.

@@ -43,7 +43,8 @@ class SyncManager:
             try:
                 interval_str = SettingsService.get().sync_interval
                 interval = parse_interval(interval_str)
-            except Exception:
+            except Exception as e:
+                print(e)
                 interval = 3600
 
             await asyncio.sleep(interval)

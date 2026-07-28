@@ -79,7 +79,7 @@ export default function Topbar() {
           )}
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20">
-          <span className="text-sm font-semibold text-accent">v1.0.3</span>
+          <span className="text-sm font-semibold text-accent">v1.0.4</span>
         </div>
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent/15 text-accent text-xs font-semibold">
           {username.charAt(0).toUpperCase() || 'A'}

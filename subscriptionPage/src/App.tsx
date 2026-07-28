@@ -8,6 +8,8 @@ import {
   CheckCircleIcon,
   NoSymbolIcon,
   ChevronDownIcon,
+  MagnifyingGlassIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 import AndroidSvg from './assets/icons/android.svg?react'
 import WindowsSvg from './assets/icons/windows.svg?react'
@@ -45,9 +47,14 @@ function usePlatform() {
 
 function useToast() {
   const [message, setMessage] = useState<string | null>(null)
+  const timerRef = useState(() => ({ current: undefined as ReturnType<typeof setTimeout> | undefined }))[0]
+
+  useEffect(() => () => { clearTimeout(timerRef.current) }, [])
+
   const show = (msg: string) => {
+    clearTimeout(timerRef.current)
     setMessage(msg)
-    setTimeout(() => setMessage(null), 2500)
+    timerRef.current = setTimeout(() => setMessage(null), 2500)
   }
   return { message, show }
 }
@@ -63,41 +70,82 @@ function useSubId(): string | null {
   const match = window.location.pathname.match(/^\/([^/]+)/)
   return match ? match[1] : null
 }
+type CheckStatus = 'loading' | 'exists' | 'not_found'
 
-function useProviderName(): string | null {
+function useSubscriptionCheck(): {
+  status: CheckStatus
+  providerName: string | null
+  networkError: boolean
+} {
   const subId = useSubId()
-  const [name, setName] = useState<string | null>(null)
+  const [status, setStatus] = useState<CheckStatus>(() => subId ? 'loading' : 'not_found')
+  const [providerName, setProviderName] = useState<string | null>(null)
+  const [networkError, setNetworkError] = useState(false)
 
   useEffect(() => {
-    if (!subId) return
-    fetch(`/${subId}/raw`)
-      .then((r) => r.ok ? r.text() : null)
-      .then((text) => {
-        if (!text) return
-        const firstLine = text.split('\n')[0]
-        const m = firstLine.match(/^#name:\s*(.+)$/)
-        if (m) setName(m[1].trim())
+    if (!subId) {
+      setStatus('not_found')
+      setNetworkError(false)
+      return
+    }
+
+    setStatus('loading')
+    setProviderName(null)
+    setNetworkError(false)
+
+    fetch(`/${subId}/check`)
+      .then((r) => {
+        if (r.status === 404) {
+          setStatus('not_found')
+          return null
+        }
+        if (!r.ok) {
+          setStatus('not_found')
+          return null
+        }
+        return r.text()
       })
-      .catch(() => {})
+      .then((text) => {
+        if (text === null) return
+        if (!text.trim()) {
+          setStatus('not_found')
+          return
+        }
+        setProviderName(text)
+        setStatus('exists')
+      })
+      .catch(() => {
+        setStatus('not_found')
+        setNetworkError(true)
+      })
   }, [subId])
 
-  return name
+  return { status, providerName, networkError }
 }
 
 export default function App() {
   const ios = useIOSCheck()
   const toast = useToast()
   const currentUrl = useCurrentUrl()
+  const { status, providerName, networkError } = useSubscriptionCheck()
   const [showMain, setShowMain] = useState(false)
 
   if (ios && !showMain) {
     return <IosOverlay onShowMain={() => setShowMain(true)} />
   }
 
+  if (status === 'loading') {
+    return <LoadingScreen />
+  }
+
+  if (status === 'not_found') {
+    return <NotFoundScreen networkError={networkError} />
+  }
+
   return (
     <div className="min-h-screen">
       <LanguageSwitcher />
-      <Hero />
+      <Hero providerName={providerName} />
       <main className="max-w-3xl mx-auto px-5 pb-16 space-y-6">
         <DownloadSection />
         <SubscribeSection url={currentUrl} showToast={toast.show} />
@@ -129,6 +177,20 @@ function LanguageSwitcher() {
           {lang.toUpperCase()}
         </button>
       ))}
+    </div>
+  )
+}
+
+/* ─── Loading Screen ─── */
+
+function LoadingScreen() {
+  const { t } = useLanguage()
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-bg-primary">
+      <div className="flex flex-col items-center gap-4 animate-fade-in">
+        <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin" />
+        <p className="text-sm text-text-muted">{t('checking')}</p>
+      </div>
     </div>
   )
 }
@@ -168,6 +230,41 @@ function IosOverlay({ onShowMain }: { onShowMain: () => void }) {
   )
 }
 
+/* ─── Not Found Screen ─── */
+
+function NotFoundScreen({ networkError }: { networkError: boolean }) {
+  const { t } = useLanguage()
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-primary">
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(1200px 600px at 100% -10%, rgba(99, 102, 241, 0.08), transparent 60%)',
+        }}
+      />
+      <div className="relative z-10 max-w-sm w-full mx-5 animate-scale-in">
+        <div className="bg-bg-secondary border border-border rounded-xl shadow-elevated p-8 text-center space-y-5">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-full"
+            style={{ backgroundColor: networkError ? 'rgba(248, 81, 73, 0.1)' : 'rgba(210, 153, 34, 0.1)' }}>
+            {networkError
+              ? <ExclamationTriangleIcon className="w-8 h-8 text-danger" />
+              : <MagnifyingGlassIcon className="w-8 h-8 text-warning" />
+            }
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-text-primary">
+              {networkError ? t('networkErrorTitle') : t('notFoundTitle')}
+            </h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {networkError ? t('networkErrorDesc') : t('notFoundDesc')}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Toast ─── */
 
 function Toast({ message }: { message: string | null }) {
@@ -185,9 +282,8 @@ function Toast({ message }: { message: string | null }) {
 
 /* ─── Hero ─── */
 
-function Hero() {
+function Hero({ providerName }: { providerName: string | null }) {
   const { t } = useLanguage()
-  const providerName = useProviderName()
   return (
     <header className="relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none"
@@ -359,13 +455,12 @@ function TipsSection() {
 
 function Footer() {
   const { t } = useLanguage()
-  const providerName = useProviderName()
   return (
     <footer className="border-t border-border">
       <div className="max-w-3xl mx-auto px-5 py-8 text-center space-y-2">
         <div className="flex items-center justify-center gap-2 text-text-muted">
           <WavesIcon className="w-4 h-4" />
-          <span className="text-xs font-medium">{providerName || 'OLCWave'}</span>
+          <span className="text-xs font-medium">OLCWave</span>
         </div>
         <p className="text-xs text-text-muted">
           {t('footerTagline')}

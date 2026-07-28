@@ -1,3 +1,4 @@
+import asyncio
 import json
 from fastapi import Response
 from remnawave.models import SubscriptionInfoResponseDto
@@ -12,7 +13,7 @@ from rw.sdk import isUserValid
 from users.service import Users
 
 import yaml
-import random
+import secrets
 import emoji
 
 TRANSPORT_NAMES = {
@@ -73,7 +74,7 @@ class Subscriptions:
     @staticmethod
     async def profile_to_config(profile: str):
         config = yaml.safe_load(profile)  # pyright: ignore[reportAny]
-        config["crypto"]["key"] = random.randbytes(32).hex()
+        config["crypto"]["key"] = secrets.token_hex(32)
 
         if (
             config["auth"]["provider"] in ["telemost", "wbstream"] and
@@ -91,15 +92,15 @@ class Subscriptions:
             config["room"]["id"] = generated_room_id
 
         if config["auth"]["provider"] == "telemost":
-            config["auth"].pop("token")
+            config["auth"].pop("token", None)
 
         if config["auth"]["provider"] == "jitsi":
             roomUrl: list[str] = config["room"]["id"].split("/")  # pyright: ignore[reportAny]
 
             if len(roomUrl) == 3:
-                roomUrl.append(str(random.randbytes(16).hex()))
+                roomUrl.append(str(secrets.token_hex(16)))
             elif len(roomUrl) == 4 and not roomUrl[3]:
-                roomUrl[3] = str(random.randbytes(16).hex())
+                roomUrl[3] = str(secrets.token_hex(16))
             
             config['room']['id'] = "/".join(roomUrl)
 
@@ -222,34 +223,72 @@ class Subscriptions:
     async def ensure_profiles_running(short_uuid: str):
         running_tags = Subscriptions.get_launched_tags(short_uuid)
 
-        configs = {
-            tag: OlcRTC.get_config(f"olcwave-{tag}-{short_uuid}").output.decode()
-            for tag in running_tags
-        }
+        async def load_config(tag):
+            container_name = f"olcwave-{tag}-{short_uuid}"
 
-        for tag, config in configs.items():
+            config = await asyncio.to_thread(
+                OlcRTC.get_config,
+                container_name,
+            )
+
+            return tag, config.output.decode()
+
+        loaded_configs = await asyncio.gather(
+            *(load_config(tag) for tag in running_tags)
+        )
+
+        configs = dict(loaded_configs)
+
+        async def check_profile(tag, config):
             config_obj = yaml.safe_load(config)
-            if config_obj["auth"]["provider"] in ("telemost", "wbstream"):
+
+            provider = config_obj["auth"]["provider"]
+
+            if provider in ("telemost", "wbstream"):
                 room_exists = await RoomChecker.check_room_id(
-                    config_obj["auth"]["provider"],
+                    provider,
                     config_obj["room"]["id"],
                     config_obj["auth"].get("token", ""),
                 )
 
                 if not room_exists:
                     container_name = f"olcwave-{tag}-{short_uuid}"
-                    OlcRTC.remove(container_name)
+
+                    await asyncio.to_thread(
+                        OlcRTC.remove,
+                        container_name,
+                    )
+
+        await asyncio.gather(
+            *(check_profile(tag, config) for tag, config in configs.items())
+        )
+
+        profiles_list = await Profiles.get_all()
 
         profiles = {
             profile.tag: profile
-            for profile in await Profiles.get_all()
+            for profile in profiles_list
         }
 
-        for tag in profiles.keys() - configs.keys():
-            config = await Subscriptions.profile_to_config(profiles[tag].profile)
+        missing_tags = profiles.keys() - configs.keys()
+
+        async def start_profile(tag):
+            config = await Subscriptions.profile_to_config(
+                profiles[tag].profile
+            )
+
             configs[tag] = config
 
-            Containers.run(config, tag, short_uuid)
+            await asyncio.to_thread(
+                Containers.run,
+                config,
+                tag,
+                short_uuid,
+            )
+
+        await asyncio.gather(
+            *(start_profile(tag) for tag in missing_tags)
+        )
 
         return configs, profiles
 

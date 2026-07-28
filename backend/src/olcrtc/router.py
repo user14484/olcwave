@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth.dependencies import get_current_admin
-from settings.service import SettingsService
+from xraycore.sdk import XrayCore
 from olcrtc.schemas import ContainerSchema, ContainerConfigSchema, ContainerLogsSchema, ContainerStatsSchema
 from olcrtc.service import Containers
 from users.service import Users
@@ -39,8 +39,7 @@ async def stop(name: str, _admin: dict = Depends(get_current_admin)):
 
 @router.post("/restart")
 async def restart(name: str, _admin: dict = Depends(get_current_admin)):
-    settings = SettingsService.get()
-    if settings.xray_routing_enabled:
+    if XrayCore.is_running():
         Containers.restart(name, f"host.docker.internal:10808")
     else:
         Containers.restart(name)

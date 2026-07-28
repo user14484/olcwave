@@ -41,6 +41,12 @@ const ru: Translation = {
   iosDesc: 'OLCBox доступен для Android и десктопных платформ. Поддержка iOS запланирована на будущее.',
   iosButton: 'Показать инструкции всё равно',
 
+  checking: 'Проверка подписки...',
+  notFoundTitle: 'Подписка не найдена',
+  notFoundDesc: 'Возможно, ссылка устарела или была удалена.',
+  networkErrorTitle: 'Ошибка сети',
+  networkErrorDesc: 'Проверьте подключение к интернету и повторите попытку.',
+
   langEn: 'EN',
   langRu: 'RU',
 }

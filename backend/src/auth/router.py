@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, status
 import jwt
+import secrets
 
 from config import settings
 from auth.schemas import LoginRequest, TokenResponse
@@ -10,8 +11,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest):
-    if body.username != settings.ADMIN_USERNAME or body.password != settings.ADMIN_PASSWORD:
+async def login(body: LoginRequest):  
+    if body.username != settings.ADMIN_USERNAME or not secrets.compare_digest(body.password, settings.ADMIN_PASSWORD):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",

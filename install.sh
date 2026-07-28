@@ -131,21 +131,19 @@ build_xraycore(){
 
   docker build . --tag xraycore
 
+  docker run -d --name olcwave-xraycore xraycore
+  docker stop olcwave-xraycore
+
   cd ../..
 }
 
 enable_swapfile() {
     local SWAPFILE="/swapfile"
-    local SIZE_GB=4
-    local MIN_RAM_KB=$((SIZE_GB * 1000 * 1000))
+    local TARGET_GB=4
+    local TARGET_KB=$((TARGET_GB * 1024 * 1024))
 
     local TOTAL_RAM_KB
     TOTAL_RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
-
-    if [ "$TOTAL_RAM_KB" -ge "$MIN_RAM_KB" ]; then
-        info "RAM >= ${SIZE_GB}GB, skipping swap creation"
-        return 0
-    fi
 
     if swapon --show --noheadings | grep -q .; then
         info "Swap already exists, skipping"
@@ -153,7 +151,21 @@ enable_swapfile() {
         return 0
     fi
 
-    info "RAM < ${SIZE_GB}GB and no swap found, creating ${SIZE_GB}GB swapfile..."
+    if [ "$TOTAL_RAM_KB" -ge "$TARGET_KB" ]; then
+        info "RAM >= ${TARGET_GB}GB, no swap required"
+        return 0
+    fi
+
+    local SWAP_KB=$((TARGET_KB - TOTAL_RAM_KB))
+    local SWAP_MB=$((SWAP_KB / 1000))
+
+    if [ "$SWAP_MB" -le 0 ]; then
+        info "No swap needed"
+        return 0
+    fi
+
+    info "RAM is less than ${TARGET_GB}GB"
+    info "Creating ${SWAP_MB}MB swapfile..."
 
     if [ -e "$SWAPFILE" ]; then
         info "${SWAPFILE} already exists but is not active, skipping"
@@ -163,7 +175,7 @@ enable_swapfile() {
     dd if=/dev/zero \
        of="$SWAPFILE" \
        bs=1M \
-       count=$((SIZE_GB * 1024)) \
+       count="$SWAP_MB" \
        status=progress
 
     chmod 600 "$SWAPFILE"
@@ -409,6 +421,13 @@ verify_stack() {
 
   success "API container is running."
   docker compose ps
+
+  until curl -sf https://${PANEL_DOMAIN}/api/health >/dev/null; do
+    info "waiting for api..."
+        sleep 2
+    done
+
+  success "API is ready"
 }
 
 # ---------------------------------------------------------------------------

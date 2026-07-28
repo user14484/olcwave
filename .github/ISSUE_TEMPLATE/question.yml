@@ -1,0 +1,33 @@
+name: Задать вопрос
+description: Вопрос по использованию проекта
+title: "[Question]: "
+labels:
+  - question
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Если у вас возник вопрос по использованию проекта - задайте его здесь.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Ваш вопрос
+      description: Что вы хотите узнать?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Контекст
+      description: Что вы уже пробовали? Какая у вас конфигурация?
+      placeholder: Версия, ОС, способ установки и т.д.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Дополнительная информация
+      description: При необходимости приложите логи, скриншоты или конфигурацию.
+      render: shell

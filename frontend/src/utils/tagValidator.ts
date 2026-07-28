@@ -27,6 +27,6 @@ export async function checkTag(tag: string, excludeTag?: string): Promise<TagVal
     }
     return { valid: true }
   } catch {
-    return { valid: true }
+    return { valid: false, message: 'Could not verify tag uniqueness' }
   }
 }

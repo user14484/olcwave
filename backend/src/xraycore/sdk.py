@@ -11,10 +11,8 @@ client = docker.from_env()
 class XrayCore:
     @staticmethod
     def run(xray_json: str):
-        name = f"olcwave-xraycore"
-
         try:
-            old = client.containers.get(name)
+            old = client.containers.get("olcwave-xraycore")
             old.remove(force=True)
         except Exception:
             pass
@@ -27,8 +25,8 @@ class XrayCore:
                 "CONFIG": xray_json,
             },
             ports={
-                "10808/tcp": ("127.0.0.1", 10808),
-                "10808/udp": ("127.0.0.1", 10808),
+                "10808/tcp": ("172.17.0.1", 10808),
+                "10808/udp": ("172.17.0.1", 10808),
             }
         )
 
@@ -50,6 +48,14 @@ class XrayCore:
     @staticmethod
     def get() -> Container:
         return client.containers.get("olcwave-xraycore")
+
+    @staticmethod
+    def is_running() -> bool:
+        try:
+            container = client.containers.get("olcwave-xraycore")
+            return container.status == "running"
+        except NotFound:
+            return False
 
     @staticmethod
     def get_geoip() -> bytes:

@@ -22,8 +22,8 @@ import {
 const RW_SYNC_OPTIONS: { value: string; labelKey: TranslationKey }[] = [
     { value: '1m', labelKey: 'everyMinute' },
     { value: '5m', labelKey: 'every5Minutes' },
+    { value: '15m', labelKey: 'every15Minutes' },
     { value: '1h', labelKey: 'everyHour' },
-    { value: '2h', labelKey: 'every4Hours' },
     { value: '6h', labelKey: 'every6Hours' },
     { value: '12h', labelKey: 'every12Hours' },
     { value: '24h', labelKey: 'onceADay' },

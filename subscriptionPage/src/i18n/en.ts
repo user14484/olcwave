@@ -39,6 +39,12 @@ const translations = {
   iosDesc: 'OLCBox is currently available for Android and Desktop platforms. iOS support is planned for a future release.',
   iosButton: 'View setup instructions anyway',
 
+  checking: 'Checking subscription...',
+  notFoundTitle: 'Subscription not found',
+  notFoundDesc: 'The link may be outdated or has been deleted.',
+  networkErrorTitle: 'Network error',
+  networkErrorDesc: 'Check your internet connection and try again.',
+
   langEn: 'EN',
   langRu: 'RU',
 }

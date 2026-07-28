@@ -74,6 +74,8 @@ cd ../..
 ```bash
 cd backend/xraycore
 docker build . --tag xraycore
+docker run -d --name olcwave-xraycore xraycore
+docker stop olcwave-xraycore
 cd ../..  
 ```
 ---
@@ -131,12 +133,13 @@ VITE_SUB_URL_TEMPLATE=https://olcsub.example.org/{uuid}
 
 ---
 
-# 8. Сборка frontend
+# 8. Сборка frontend и страницы подписки
 
 Caddy раздает статические файлы из:
 
 ```text
 frontend/dist
+subscriptionPage/dist
 ```
 
 поэтому сборка выполняется один раз на хосте:
@@ -144,7 +147,12 @@ frontend/dist
 ```bash
 cd frontend
 npm ci
-npm run build      # создает frontend/dist
+npm run build         # создает frontend/dist
+cd ..
+
+cd subscriptionPage
+npm ci
+npm run build         # создает subscriptionPage/dist
 cd ..
 ```
 
@@ -152,18 +160,26 @@ cd ..
 
 # 9. Настройка доменов в Caddy
 
-Откройте:
+Конфигурация Caddy находится в шаблоне:
 
 ```text
-caddy/Caddyfile
+caddy/Caddyfile.template
 ```
 
-и замените пример доменов на свои:
+При запуске `install.sh` он автоматически генерирует `caddy/Caddyfile` из шаблона, подставляя ваши домены.
+
+При ручной настройке скопируйте шаблон и замените плейсхолдеры:
+
+```bash
+cp caddy/Caddyfile.template caddy/Caddyfile
+```
+
+Отредактируйте `caddy/Caddyfile`, заменив `{{PANEL_DOMAIN}}` и `{{SUB_DOMAIN}}` на свои домены.
+
+Итоговый файл будет выглядеть так:
 
 ```caddyfile
 olcwave.example.org {
-    # /api/* удаляется перед проксированием:
-    # /api/auth/login -> /auth/login в backend.
     handle_path /api/* {
         reverse_proxy api:8000
     }
@@ -175,41 +191,35 @@ olcwave.example.org {
     }
 }
 
+
 olcsub.example.org {
+    @check path_regexp check ^/(?P<id>[^/]+)/check$
+
+    handle @check {
+        rewrite * /sub/{re.id}/check
+        reverse_proxy api:8000
+    }
+
+    @browser header_regexp browser User-Agent (?i)^Mozilla/
+
+    handle @browser {
+        root * /srv/subscriptionPage/dist
+        try_files {path} /index.html
+        file_server
+    }
+
     handle {
         rewrite * /sub{uri}
-        reverse_proxy olcwave.example.org
+        reverse_proxy api:8000
     }
 }
 ```
 
-* `olcwave.example.org` обслуживает SPA и проксирует `/api/*` в backend, удаляя префикс `/api`.
-
-  Поэтому:
-
-  ```text
-  VITE_API_URL
-  ```
-
-  заканчивается на:
-
-  ```text
-  /api
-  ```
-
-  а backend продолжает видеть свои настоящие маршруты:
-
-  ```text
-  /auth/login
-  ```
-
-* `olcsub.example.org/<uuid>` переписывается в:
-
-  ```text
-  olcwave.example.org/sub/<uuid>
-  ```
-
-  Это публичный URL подписки.
+* `olcwave.example.org` обслуживает SPA панели и проксирует `/api/*` в backend, удаляя префикс `/api`.
+* `olcsub.example.org` обрабатывает три типа запросов:
+  1. `GET /<uuid>/check` — проверка существования подписки (проксируется в `/sub/<uuid>/check`);
+  2. Браузерные запросы — обслуживает SPA страницы подписки;
+  3. Все остальное (OLCBox, curl) — возвращает raw-текст подписки.
 
 Compose публикует порты:
 
@@ -220,13 +230,7 @@ Compose публикует порты:
 
 Они нужны Caddy для автоматического HTTPS на настоящих доменах.
 
-Если нужен только обычный HTTP для быстрого тестирования, замените блок:
-
-```caddyfile
-olcwave.example.org { ... }
-```
-
-на:
+Если нужен только обычный HTTP для быстрого тестирования, используйте:
 
 ```caddyfile
 :80 {
@@ -261,6 +265,11 @@ docker compose up -d
 Backend автоматически создает таблицы базы данных при первом запуске.
 
 Отдельный шаг миграции пока не требуется.
+
+Caddy использует два Docker volume для хранения данных:
+
+* `caddy_data` — сертификаты TLS/ACME;
+* `caddy_config` — директория конфигурации API.
 
 ---
 
@@ -335,9 +344,11 @@ git pull
 
 cd frontend && npm ci && npm run build && cd ..
 
+cd subscriptionPage && npm ci && npm run build && cd ..
+
 cd backend/olcrtc && docker build . --tag olcrtc && cd ../..
 
-cd backend/xraycore && docker build . --tag xraycore && cd ../..
+cd backend/xraycore && docker build . --tag xraycore && docker run -d --name olcwave-xraycore xraycore && docker stop olcwave-xraycore && cd ../..
 
 docker compose up -d --build
 ```

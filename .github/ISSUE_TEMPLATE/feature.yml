@@ -1,0 +1,39 @@
+name: Предложить новую функцию
+description: Предложение по улучшению проекта
+title: "[Feature]: "
+labels:
+  - enhancement
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за предложение!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему решает?
+      description: Что сейчас неудобно или чего не хватает?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Предлагаемое решение
+      description: Опишите, как должна работать новая возможность.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Альтернативы
+      description: Рассматривали ли вы другие варианты?
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Дополнительная информация
+      description: При необходимости добавьте примеры, ссылки или изображения.

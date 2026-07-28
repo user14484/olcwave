@@ -1,0 +1,61 @@
+name: Сообщить об ошибке
+description: Нашли ошибку или неожиданное поведение
+title: "[Bug]: "
+labels:
+  - bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за репорт! Пожалуйста, заполните информацию ниже.
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: Какая версия OLCWave используется?
+      placeholder: "Например: v1.0.0"
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Способ установки
+      options:
+        - install.sh
+        - Ручная установка
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Описание проблемы
+      description: Опишите, что произошло.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги для воспроизведения
+      description: Опишите, как повторить ошибку.
+      placeholder: |
+        1. Выполнить ...
+        2. Открыть ...
+        3. Получить ошибку ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      description: Что должно было произойти?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи
+      description: Приложите логи или stack trace, если есть.
+      render: shell

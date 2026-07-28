@@ -1,11 +1,10 @@
 import asyncio
-from fastapi.exceptions import HTTPException
 
+from docker.errors import NotFound
 from fastapi import HTTPException
 
 import json
 
-from settings.service import SettingsService
 from xraycore.sdk import XrayCore
 from database import async_session_factory
 from routing.db import RoutingDB
@@ -98,20 +97,12 @@ class Routing:
 
     @staticmethod
     async def create(routing: str):
-        from olcrtc.service import Containers
-
         Routing.validate_routing_geotags(routing)
 
         xray_json = Routing.routing_to_xray_json(routing)
 
         async with async_session_factory() as db:  
             _= await RoutingDB.create(db, xray_json)
-
-
-        settings = SettingsService.get()
-        settings.xray_routing_enabled = True
-
-        await SettingsService.set(settings)
 
         XrayCore.run(xray_json)
 
@@ -127,8 +118,6 @@ class Routing:
 
     @staticmethod
     async def update(routing: str):
-        from olcrtc.service import Containers
-
         Routing.validate_routing_geotags(routing)
 
         xray_json = Routing.routing_to_xray_json(routing)
@@ -143,16 +132,13 @@ class Routing:
 
     @staticmethod
     async def delete():
-        from olcrtc.service import Containers
         async with async_session_factory() as db:  
             _=await RoutingDB.delete(db)
 
-        settings = SettingsService.get()
-        settings.xray_routing_enabled = False
-        
-        await SettingsService.set(settings)
-
-        XrayCore.stop()
+        try:
+            XrayCore.stop()
+        except NotFound:
+            pass
 
         asyncio.create_task(Routing.restart_all_with_proxy())
 

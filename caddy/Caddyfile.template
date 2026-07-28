@@ -12,10 +12,10 @@
 
 
 {{SUB_DOMAIN}} {
-    @raw path_regexp raw ^/(?P<id>[^/]+)/raw$
+    @check path_regexp check ^/(?P<id>[^/]+)/check$
 
-    handle @raw {
-        rewrite * /sub/{re.id}
+    handle @check {
+        rewrite * /sub/{re.id}/check
         reverse_proxy api:8000
     }
 

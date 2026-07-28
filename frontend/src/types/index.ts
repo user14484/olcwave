@@ -29,23 +29,6 @@ export interface Profile {
   profile: string
 }
 
-export interface SubscriptionLocation {
-  storage_id: string
-  name: string
-  endpoint: {
-    room_id: string
-    key: string
-  }
-  auth_provider: string
-  transport: Record<string, unknown>
-}
-
-export interface SubscriptionBundle {
-  version: number
-  active_location_id: string
-  locations: SubscriptionLocation[]
-}
-
 export interface Container {
   id: string
   name: string

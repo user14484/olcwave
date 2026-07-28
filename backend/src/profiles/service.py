@@ -29,7 +29,7 @@ class Profiles:
         profile.profile = Profiles.validate(profile.profile)
 
         if not profile.tag:
-            return HTTPException(status_code=400, detail="Tag cannot be empty")
+            raise HTTPException(status_code=400, detail="Tag cannot be empty")
 
         profile.tag = profile.tag.replace("-", "")
 
