@@ -97,7 +97,7 @@ Entry point записывает переменную окружения `CONFIG
 
 ### Внутри контейнера: `stats.json`
 
-`proxy.go` оборачивает каждое принятое соединение в counting reader/writer. Он периодически записывает `/var/lib/olcwave/stats.json`:
+`proxy.go` оборачивает каждое принятое соединение в counting reader/writer. Он периодически записывает `/tmp/olcwave/stats.json`:
 
 ```json
 {

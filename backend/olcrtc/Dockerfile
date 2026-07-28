@@ -56,6 +56,6 @@ RUN mkdir -p \
 
 ENV PROXY_BIND_ADDR=127.0.0.1
 ENV PROXY_PORT=1080
-ENV STATS_FILE=/var/lib/olcwave/stats.json
+ENV STATS_FILE=/tmp/olcwave/stats.json
 
 ENTRYPOINT ["/app/entrypoint.sh"]

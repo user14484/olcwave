@@ -222,7 +222,7 @@ traffic_used_bytes
 * Посмотрите сырую статистику внутри контейнера:
 
   ```bash
-  docker exec olcwave-<tag>-<uuid> cat /var/lib/olcwave/stats.json
+  docker exec olcwave-<tag>-<uuid> cat /tmp/olcwave/stats.json
   ```
 
   Если здесь:

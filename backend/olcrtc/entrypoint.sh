@@ -4,7 +4,7 @@ set -eu
 : "${CONFIG:?CONFIG env is required}"
 : "${PROXY_PORT:=1080}"
 : "${PROXY_BIND_ADDR:=127.0.0.1}"
-: "${STATS_FILE:=/var/lib/olcwave/stats.json}"
+: "${STATS_FILE:=/tmp/olcwave/stats.json}"
 
 mkdir -p /var/lib/olcwave /tmp/olcwave
 

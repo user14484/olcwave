@@ -10,7 +10,7 @@ router = APIRouter(prefix="/containers", tags=["containers"])
 
 @router.get("/all")
 async def get_all(_admin: dict = Depends(get_current_admin)) -> list[ContainerSchema]:
-    return Containers.all()
+    return await Containers.all()
 
 @router.post("/run")
 async def run(name: str, _admin: dict = Depends(get_current_admin)):
@@ -27,39 +27,39 @@ async def run(name: str, _admin: dict = Depends(get_current_admin)):
                 detail="traffic_limit_exceeded",
             )
 
-    Containers.start(name)
+    await Containers.start(name)
 
     return "ok"
 
 @router.post("/stop")
 async def stop(name: str, _admin: dict = Depends(get_current_admin)):
-    Containers.stop(name)
+    await Containers.stop(name)
 
     return "ok"
 
 @router.post("/restart")
 async def restart(name: str, _admin: dict = Depends(get_current_admin)):
-    if XrayCore.is_running():
-        Containers.restart(name, f"host.docker.internal:10808")
+    if await XrayCore.is_running():
+        await Containers.restart(name, "host.docker.internal:10808")
     else:
-        Containers.restart(name)
+        await Containers.restart(name)
 
     return "ok"
 
 @router.delete("/")
 async def remove(name: str, _admin: dict = Depends(get_current_admin)):
-    Containers.remove(name)
+    await Containers.remove(name)
 
     return "ok"
 
 @router.get("/logs")
 async def logs(name: str, _admin: dict = Depends(get_current_admin)) -> ContainerLogsSchema:
-    return Containers.logs(name)
+    return await Containers.logs(name)
 
 @router.get("/config")
 async def get_config(name: str, _admin: dict = Depends(get_current_admin)) -> ContainerConfigSchema:
-    return Containers.get_config(name)
+    return await Containers.get_config(name)
 
 @router.get("/stats")
 async def get_stats(name: str, _admin: dict = Depends(get_current_admin)) -> ContainerStatsSchema:
-    return Containers.get_stats(name)
+    return await Containers.get_stats(name)

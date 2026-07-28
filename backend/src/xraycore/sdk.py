@@ -1,78 +1,117 @@
-import json
 import io
 import tarfile
-import docker
-from docker.errors import ImageNotFound, NotFound
-from docker.models.containers import Container
 
-client = docker.from_env()
+import docker_client
+from aiodocker import DockerError
+from aiodocker.containers import DockerContainer
 
 
 class XrayCore:
+    CONTAINER_NAME = "olcwave-xraycore"
+
     @staticmethod
-    def run(xray_json: str):
+    async def run(xray_json: str) -> DockerContainer:
+        docker = docker_client.docker
         try:
-            old = client.containers.get("olcwave-xraycore")
-            old.remove(force=True)
-        except Exception:
+            old = await docker.containers.get(XrayCore.CONTAINER_NAME)
+            await old.delete(force=True)
+        except DockerError:
             pass
 
-        return client.containers.run(
-            image="xraycore",
-            name="olcwave-xraycore",
-            detach=True,
-            environment={
-                "CONFIG": xray_json,
+        container = await docker.containers.create(
+            config={
+                "Image": "xraycore",
+                "Env": [
+                    f"CONFIG={xray_json}",
+                ],
+                "HostConfig": {
+                    "PortBindings": {
+                        "10808/tcp": [
+                            {
+                                "HostIp": "172.17.0.1",
+                                "HostPort": "10808",
+                            }
+                        ],
+                        "10808/udp": [
+                            {
+                                "HostIp": "172.17.0.1",
+                                "HostPort": "10808",
+                            }
+                        ],
+                    },
+                },
+                "ExposedPorts": {
+                    "10808/tcp": {},
+                    "10808/udp": {},
+                },
             },
-            ports={
-                "10808/tcp": ("172.17.0.1", 10808),
-                "10808/udp": ("172.17.0.1", 10808),
-            }
+            name=XrayCore.CONTAINER_NAME,
         )
 
+        await container.start()
+
+        return container
+
     @staticmethod
-    def start():
+    async def start() -> None:
+        docker = docker_client.docker
         try:
-            client.containers.get("olcwave-xraycore").start()
-        except NotFound:
+            container = await docker.containers.get(XrayCore.CONTAINER_NAME)
+            await container.start()
+        except DockerError:
             print("XRAY CONTAINER NOT FOUND")
 
     @staticmethod
-    def stop():
-        client.containers.get("olcwave-xraycore").stop()
+    async def stop() -> None:
+        docker = docker_client.docker
+        container = await docker.containers.get(XrayCore.CONTAINER_NAME)
+        await container.stop()
 
     @staticmethod
-    def logs() -> str:
-        return client.containers.get("olcwave-xraycore").logs().decode()
+    async def logs() -> str:
+        docker = docker_client.docker
+        container = await docker.containers.get(XrayCore.CONTAINER_NAME)
+        logs = await container.log(stdout=True, stderr=True)
+        return "".join(logs)
 
     @staticmethod
-    def get() -> Container:
-        return client.containers.get("olcwave-xraycore")
+    async def get() -> DockerContainer:
+        docker = docker_client.docker
+        return await docker.containers.get(XrayCore.CONTAINER_NAME)
 
     @staticmethod
-    def is_running() -> bool:
+    async def is_running() -> bool:
+        docker = docker_client.docker
         try:
-            container = client.containers.get("olcwave-xraycore")
-            return container.status == "running"
-        except NotFound:
+            container = await docker.containers.get(XrayCore.CONTAINER_NAME)
+            info = await container.show()
+            return info["State"]["Status"] == "running"
+        except DockerError:
             return False
 
     @staticmethod
-    def get_geoip() -> bytes:
-        container = client.containers.get("olcwave-xraycore")
+    async def _get_archive(path: str) -> bytes:
+        docker = docker_client.docker
+        async with docker._query(
+            f"containers/{XrayCore.CONTAINER_NAME}/archive",
+            method="GET",
+            params={"path": path},
+        ) as response:
+            archive = await response.read()    
 
-        stream, _ = container.get_archive("/app/geoip.dat")
+            with tarfile.open(fileobj=io.BytesIO(archive), mode="r:*") as tar:
+                member = tar.getmembers()[0]
 
-        with tarfile.open(fileobj=io.BytesIO(b"".join(stream))) as tar:
-            member = tar.getmembers()[0]
-            return tar.extractfile(member).read()
+                fp = tar.extractfile(member)
+                if fp is None:
+                    raise FileNotFoundError(path)
+
+                return fp.read()
 
     @staticmethod
-    def get_geosite() -> bytes:
-        container = client.containers.get("olcwave-xraycore")
+    async def get_geoip() -> bytes:
+        return await XrayCore._get_archive("/app/geoip.dat")
 
-        stream, _ = container.get_archive("/app/geosite.dat")
-
-        with tarfile.open(fileobj=io.BytesIO(b"".join(stream))) as tar:
-            member = tar.getmembers()[0]
-            return tar.extractfile(member).read()
+    @staticmethod
+    async def get_geosite() -> bytes:
+        return await XrayCore._get_archive("/app/geosite.dat")

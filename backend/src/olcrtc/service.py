@@ -1,83 +1,128 @@
-from docker.models.containers import Container
-from fastapi import HTTPException
+import asyncio
 
-from routing.service import Routing
+from aiodocker.containers import DockerContainer
+
 from xraycore.sdk import XrayCore
 from olcrtc.sdk import OlcRTC
-from olcrtc.schemas import ContainerSchema, ContainerConfigSchema, ContainerLogsSchema, ContainerStatsSchema
+from olcrtc.schemas import (
+    ContainerConfigSchema,
+    ContainerLogsSchema,
+    ContainerSchema,
+    ContainerStatsSchema,
+)
+
 
 class Containers:
     @staticmethod
-    def is_panel_container(cont: Container) -> bool:
-        parts = cont.name.split("-")  # pyright: ignore[reportOptionalMemberAccess]
+    async def is_panel_container(cont: DockerContainer) -> bool:
+        info = await cont.show()
+
+        name = info["Name"].lstrip("/")
+        parts = name.split("-")
+
         return len(parts) == 3 and parts[0] == "olcwave"
 
     @staticmethod
-    def to_schema(cont: Container) -> ContainerSchema | None:
-        if len(cont.name.split("-")) != 3: 
-            return
+    async def to_schema(cont: DockerContainer) -> ContainerSchema | None:
+        info = await cont.show()
 
-        _, config_tag, user_id = cont.name.split("-")  # pyright: ignore[reportOptionalMemberAccess]
+        name = info["Name"].lstrip("/")
+        parts = name.split("-")
+
+        if len(parts) != 3:
+            return None
+
+        _, config_tag, user_id = parts
 
         return ContainerSchema(
-            id=cont.short_id, 
-            name=cont.name,  # pyright: ignore[reportArgumentType]
+            id=info["Id"][:12],
+            name=name,
             short_uuid=user_id,
             config_tag=config_tag,
-            status=cont.status,
-            created=cont.attrs.get("Created", ""),  # pyright: ignore[reportAny]
-            image=cont.image.tags[0] if cont.image and cont.image.tags else "olcrtc",  # pyright: ignore[reportOptionalMemberAccess]
+            status=info["State"]["Status"],
+            created=info["Created"],
+            image=info["Config"]["Image"],
         )
 
     @staticmethod
-    def all() -> list[ContainerSchema]:
-        return [  # pyright: ignore[reportReturnType]
-            Containers.to_schema(cont)
-            for cont in OlcRTC.all(include_stopped=True)
-            if Containers.is_panel_container(cont) and Containers.to_schema(cont) is not None
-        ]
+    async def all() -> list[ContainerSchema]:
+        containers = await OlcRTC.all(include_stopped=True)
+
+        schemas = await asyncio.gather(
+            *(Containers.to_schema(container) for container in containers)
+        )
+
+        return [schema for schema in schemas if schema is not None]
 
     @staticmethod
-    def run(config: str, config_tag: str, short_uuid: str):
+    async def run(
+        config: str,
+        config_tag: str,
+        short_uuid: str,
+    ) -> None:
         routing_socks_addr = ""
-        if XrayCore.is_running():
-            routing_socks_addr = f"host.docker.internal:10808"
 
-        OlcRTC.run(config, config_tag, short_uuid, routing_socks_addr)
+        if await XrayCore.is_running():
+            routing_socks_addr = "host.docker.internal:10808"
 
-    @staticmethod
-    def start(name: str):
-        OlcRTC.start(name)
-
-    @staticmethod
-    def stop(name: str):
-        OlcRTC.stop(name)
+        await OlcRTC.run(
+            config=config,
+            config_tag=config_tag,
+            user_id=short_uuid,
+            upstream_proxy_addr=routing_socks_addr,
+        )
 
     @staticmethod
-    def restart(
+    async def start(name: str) -> None:
+        await OlcRTC.start(name)
+
+    @staticmethod
+    async def stop(name: str) -> None:
+        await OlcRTC.stop(name)
+
+    @staticmethod
+    async def restart(
         name: str,
         upstream_proxy_addr: str = "",
         upstream_proxy_user: str = "",
         upstream_proxy_pass: str = "",
-    ):
-        OlcRTC.restart(name, upstream_proxy_addr, upstream_proxy_user, upstream_proxy_pass)
+    ) -> None:
+        await OlcRTC.restart(
+            name=name,
+            upstream_proxy_addr=upstream_proxy_addr,
+            upstream_proxy_user=upstream_proxy_user,
+            upstream_proxy_pass=upstream_proxy_pass,
+        )
 
     @staticmethod
-    def remove(name: str):
-        OlcRTC.remove(name)
+    async def remove(name: str) -> None:
+        await OlcRTC.remove(name)
 
     @staticmethod
-    def logs(name: str) -> ContainerLogsSchema:
-        return ContainerLogsSchema(name=name, logs=OlcRTC.logs(name))
+    async def logs(name: str) -> ContainerLogsSchema:
+        logs = await OlcRTC.logs(name)
+
+        return ContainerLogsSchema(
+            name=name,
+            logs=logs,
+        )
 
     @staticmethod
-    def get_config(name: str) -> ContainerConfigSchema:
-        config: str = OlcRTC.get_config(name).output.decode()  # pyright: ignore[reportAny]
-        return ContainerConfigSchema(name=name, config=config)
+    async def get_config(name: str) -> ContainerConfigSchema:
+        config = await OlcRTC.get_config(name)
+
+        if isinstance(config, bytes):
+            config = config.decode()
+
+        return ContainerConfigSchema(
+            name=name,
+            config=config,
+        )
 
     @staticmethod
-    def get_stats(name: str) -> ContainerStatsSchema:
-        data = OlcRTC.get_stats(name)
+    async def get_stats(name: str) -> ContainerStatsSchema:
+        data = await OlcRTC.get_stats(name)
+
         return ContainerStatsSchema(
             name=name,
             upload_bytes=int(data.get("upload_bytes", 0)),
@@ -87,36 +132,50 @@ class Containers:
             download_rate_bps=int(data.get("download_rate_bps", 0)),
         )
 
-
     @staticmethod
-    def stop_all_by_short_uuid(short_uuid: str):
-        containers = Containers.all()
-        
-        for container in containers:
-            if container.short_uuid == short_uuid:
+    async def stop_all_by_short_uuid(short_uuid: str) -> None:
+        containers = await Containers.all()
+
+        await asyncio.gather(
+            *(
                 Containers.stop(container.name)
+                for container in containers
+                if container.short_uuid == short_uuid
+            )
+        )
 
     @staticmethod
-    def stop_all_by_config_tag(config_tag: str):
-        containers = Containers.all()
+    async def stop_all_by_config_tag(config_tag: str) -> None:
+        containers = await Containers.all()
 
-        for container in containers:
-            if container.config_tag == config_tag:
+        await asyncio.gather(
+            *(
                 Containers.stop(container.name)
+                for container in containers
+                if container.config_tag == config_tag
+            )
+        )
 
     @staticmethod
-    def remove_all_by_short_uuid(short_uuid: str):
-        containers = Containers.all()
-        
-        for container in containers:
-            if container.short_uuid == short_uuid:
+    async def remove_all_by_short_uuid(short_uuid: str) -> None:
+        containers = await Containers.all()
+
+        await asyncio.gather(
+            *(
                 Containers.remove(container.name)
+                for container in containers
+                if container.short_uuid == short_uuid
+            )
+        )
 
     @staticmethod
-    def remove_all_by_config_tag(config_tag: str):
-        containers = Containers.all()
+    async def remove_all_by_config_tag(config_tag: str) -> None:
+        containers = await Containers.all()
 
-        for container in containers:
-            if container.config_tag == config_tag:
+        await asyncio.gather(
+            *(
                 Containers.remove(container.name)
-
+                for container in containers
+                if container.config_tag == config_tag
+            )
+        )

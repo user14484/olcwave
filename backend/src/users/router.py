@@ -1,10 +1,8 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends
 
 from auth.dependencies import get_current_admin
 from users.service import Users
 from users.schemas import UserSchema, TrafficInfoSchema, TrafficLimitUpdate
-from rw.sdk import getAllUsers
 
 router = APIRouter(prefix="/users", tags=["users"])
 

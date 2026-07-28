@@ -4,7 +4,7 @@
 
 import asyncio
 
-from docker.errors import NotFound
+from aiodocker import DockerError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,10 +24,11 @@ from config import settings
 from database import create_tables
 from traffic import TrafficManager
 from rw_sync import SyncManager
-
+from docker_client import init_docker, close_docker
 
 async def lifespan(app: FastAPI):
     await create_tables() # TODO: add alembic migrations
+    await init_docker()
     await SettingsService.load()
 
     try:
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI):
     except HTTPException:
         routing = False
     if routing:
-        XrayCore.run(routing)
+        await XrayCore.run(routing)
 
     SyncManager.start()
     task = asyncio.create_task(TrafficManager.run())
@@ -47,9 +48,10 @@ async def lifespan(app: FastAPI):
         pass
     await SyncManager.stop()
     try:
-        XrayCore.stop()
-    except NotFound:
+        await XrayCore.stop()
+    except DockerError:
         pass
+    await close_docker()
 
 app = FastAPI(lifespan=lifespan, openapi_url="", docs_url="", redoc_url="")  # pyright: ignore[reportArgumentType]
 

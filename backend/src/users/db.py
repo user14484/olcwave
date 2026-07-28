@@ -1,7 +1,6 @@
 from typing import Sequence
 
 from fastapi import HTTPException, status
-from datetime import datetime
 
 from sqlalchemy import delete, select, update, exists as sa_exists
 from sqlalchemy.ext.asyncio import AsyncSession

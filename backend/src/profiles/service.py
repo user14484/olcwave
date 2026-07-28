@@ -49,14 +49,14 @@ class Profiles:
         async with async_session_factory() as db:  
             _= await ProfilesDB.update(db, tag, name, profile) 
 
-        Containers.stop_all_by_config_tag(tag)
+        await Containers.remove_all_by_config_tag(tag)
 
     @staticmethod
     async def delete(tag: str):
         async with async_session_factory() as db:  
             _=await ProfilesDB.delete(db, tag) 
 
-        Containers.remove_all_by_config_tag(tag)
+        await Containers.remove_all_by_config_tag(tag)
 
     @staticmethod
     async def get_all() -> list[ProfileSchema]:

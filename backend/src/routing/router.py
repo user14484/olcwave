@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Body, HTTPException
 
 from auth.dependencies import get_current_admin
-from settings.service import SettingsService
 from xraycore.sdk import XrayCore
 from routing.service import Routing
 
@@ -38,8 +37,8 @@ async def delete(_admin: dict = Depends(get_current_admin)):
 
 @router.get("/logs")
 async def logs(_admin: dict = Depends(get_current_admin)):
-    return XrayCore.logs()
+    return await XrayCore.logs()
 
 @router.get("/geotags")
 async def get_geotags(_admin: dict = Depends(get_current_admin)):
-    return Routing.get_geotags()
+    return await Routing.get_geotags()
