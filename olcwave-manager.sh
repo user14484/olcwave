@@ -239,14 +239,13 @@ build_node_project() {
   info "Сборка $title..."
   (
     cd "$directory"
-    if [[ -f package-lock.json ]]; then
-      npm ci || npm install
-    else
-      npm install
-    fi
+    
+    # Оставляем только npm install для надежности
+    npm install
+    
     npm run build
     
-    # Откатываем изменения в lock-файле сразу после сборки, чтобы Git не ругался
+    # Откатываем изменения в lock-файле сразу после сборки, чтобы Git не ругался при следующем обновлении
     git checkout -- package-lock.json 2>/dev/null || true
   )
 }
