@@ -148,18 +148,18 @@ build_olcrtc(){
   cd ../..
 }
 
-build_xraycore(){
+build_xraycore() {
   info "Building XrayCore container"
-  cd backend/xraycore
 
-  # Используем обертку docker_retry
-  docker_retry docker build . --tag xraycore
+  docker_retry docker build backend/xraycore --tag xraycore
 
-  docker run -d --name olcwave-xraycore xraycore
-  docker stop olcwave-xraycore
-  docker rm olcwave-xraycore >/dev/null 2>&1 || true
+  if docker container inspect olcwave-xraycore >/dev/null 2>&1; then
+    docker rm -f olcwave-xraycore
+  fi
 
-  cd ../..
+  docker create --name olcwave-xraycore xraycore >/dev/null
+
+  success "XrayCore container created."
 }
 
 enable_swapfile() {

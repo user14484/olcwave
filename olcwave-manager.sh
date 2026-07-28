@@ -4,7 +4,7 @@
 #
 
 # Версия менеджера. Меняй её здесь для вызова обновлений.
-MANAGER_VERSION="1.1.0"
+MANAGER_VERSION="1.2.0"
 
 set -Eeuo pipefail
 
@@ -278,6 +278,16 @@ update_panel() {
 
   build_node_project frontend "панели"
   build_node_project subscriptionPage "страницы подписки"
+
+  info "Пересборка XrayCore..."
+  docker build backend/xraycore -t xraycore
+  
+  if docker container inspect olcwave-xraycore >/dev/null 2>&1; then
+    docker rm -f olcwave-xraycore
+  fi
+  
+  docker create --name olcwave-xraycore xraycore >/dev/null
+  success "Контейнер olcwave-xraycore подготовлен."
 
   info "Пересборка и запуск Docker Compose..."
   docker compose up -d --build
