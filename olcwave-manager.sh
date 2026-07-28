@@ -271,7 +271,7 @@ update_panel() {
     echo
     echo -e "   ${C_WHITE}1)${C_RESET} Сохранить мои изменения и объединить их с обновлением"
     echo -e "   ${C_WHITE}2)${C_RESET} Полностью заменить локальные файлы версией из GitHub"
-    echo -e "   ${C_WHITE}3)${C_RESET} Отменить обновление"
+    echo -e "   ${C_WHITE}0)${C_RESET} Отменить обновление"
     echo
 
     read -rp "$(echo -e "${C_WHITE}Выберите действие [1-3]: ${C_RESET}")" action
@@ -293,7 +293,7 @@ update_panel() {
         warn "Все локальные изменения будут удалены."
         confirm "Продолжить и сделать файлы как в origin/$branch?" || return 0
         ;;
-      3|"")
+      0|"")
         info "Обновление отменено."
         return 0
         ;;
