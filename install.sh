@@ -362,9 +362,9 @@ build_frontend() {
     if [ -d node_modules ]; then
       info "node_modules present - skipping dependency install."
     else
-      info "Installing dependencies (npm ci)..."
+      info "Installing dependencies..."
       if [ -f package-lock.json ]; then
-        npm ci
+        npm ci || npm install
       else
         npm install
       fi
@@ -384,9 +384,9 @@ build_subscription_page() {
     if [ -d node_modules ]; then
       info "node_modules present - skipping dependency install."
     else
-      info "Installing dependencies (npm ci)..."
+      info "Installing dependencies..."
       if [ -f package-lock.json ]; then
-        npm ci
+        npm ci || npm install
       else
         npm install
       fi

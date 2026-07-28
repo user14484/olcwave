@@ -168,7 +168,7 @@ build_node_project() {
   (
     cd "$directory"
     if [[ -f package-lock.json ]]; then
-      npm ci
+      npm ci || npm install
     else
       npm install
     fi
