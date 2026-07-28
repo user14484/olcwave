@@ -245,6 +245,9 @@ build_node_project() {
       npm install
     fi
     npm run build
+    
+    # Откатываем изменения в lock-файле сразу после сборки, чтобы Git не ругался
+    git checkout -- package-lock.json 2>/dev/null || true
   )
 }
 
@@ -256,6 +259,10 @@ update_panel() {
   local branch action stash_created=false
   branch="$(git branch --show-current)"
   [[ -n "$branch" ]] || die "Не удалось определить текущую ветку Git."
+
+  # Превентивно сбрасываем lock-файлы перед проверкой git status
+  git checkout -- frontend/package-lock.json 2>/dev/null || true
+  git checkout -- subscriptionPage/package-lock.json 2>/dev/null || true
 
   if [[ -n "$(git status --porcelain)" ]]; then
     warn "В репозитории есть локальные изменения:"
