@@ -492,6 +492,41 @@ caddy_menu() {
   done
 }
 
+switch_branch() {
+  command -v git >/dev/null 2>&1 || die "Git не установлен."
+  [[ -d .git ]] || die "$APP_DIR не является Git-репозиторием."
+
+  info "Получение списка веток с сервера..."
+  git fetch origin
+
+  echo
+  info "Доступные ветки:"
+  git branch -r | grep -v '\->' | sed 's|origin/||' | awk '{print "  - " $1}'
+  echo
+  
+  local current
+  current="$(git branch --show-current)"
+  info "Текущая ветка: $GREEN$current$RESET"
+  
+  read -rp "Введите имя ветки для переключения (Enter - отмена): " target
+  [[ -z "$target" ]] && return 0
+  
+  if [[ "$target" == "$current" ]]; then
+    warn "Вы уже на этой ветке."
+    return 0
+  fi
+
+  info "Переключение на ветку $target..."
+  if git checkout "$target"; then
+    success "Ветка успешно изменена."
+    if confirm "Запустить обновление панели (update_panel) для применения изменений?"; then
+      update_panel
+    fi
+  else
+    error "Не удалось переключить ветку. Возможно, у вас есть конфликтующие локальные изменения."
+  fi
+}
+
 show_logs() {
   local service
   printf '\n1) Все сервисы\n2) API/backend\n3) Caddy\n4) XrayCore\n5) OLCRTC\n0) Назад\n\n'
@@ -515,15 +550,17 @@ show_logs() {
 print_menu() {
   clear
   printf '%s%sOLCWave Manager%s\n' "$BOLD" "$GREEN" "$RESET"
-  printf 'Каталог: %s\n\n' "$APP_DIR"
+  printf 'Каталог: %s\n' "$APP_DIR"
+  printf 'Текущая ветка: %s\n\n' "$(git branch --show-current 2>/dev/null || echo "неизвестно")"
   printf '  1) Статус контейнеров\n'
-  printf '  2) Обновить панель из GitHub\n'
-  printf '  3) Перезапустить все сервисы\n'
-  printf '  4) Перезапустить API/backend\n'
-  printf '  5) Перезапустить XrayCore\n'
-  printf '  6) Перезапустить OLCRTC\n'
-  printf '  7) Управление Caddy\n'
-  printf '  8) Посмотреть логи\n'
+  printf '  2) Обновить панель (текущая ветка)\n'
+  printf '  3) Сменить ветку Git\n'
+  printf '  4) Перезапустить все сервисы\n'
+  printf '  5) Перезапустить API/backend\n'
+  printf '  6) Перезапустить XrayCore\n'
+  printf '  7) Перезапустить OLCRTC\n'
+  printf '  8) Управление Caddy\n'
+  printf '  9) Посмотреть логи\n'
   printf '  0) Выход\n\n'
 }
 
@@ -538,12 +575,13 @@ main() {
     case "$choice" in
       1) show_status; pause ;;
       2) update_panel; pause ;;
-      3) restart_all; pause ;;
-      4) restart_service "API/backend" 'api|backend'; pause ;;
-      5) restart_service "XrayCore" 'xray'; pause ;;
-      6) restart_service "OLCRTC" 'olcrtc'; pause ;;
-      7) caddy_menu; pause ;;
-      8) show_logs || true; pause ;;
+      3) switch_branch; pause ;;
+      4) restart_all; pause ;;
+      5) restart_service "API/backend" 'api|backend'; pause ;;
+      6) restart_service "XrayCore" 'xray'; pause ;;
+      7) restart_service "OLCRTC" 'olcrtc'; pause ;;
+      8) caddy_menu; pause ;;
+      9) show_logs || true; pause ;;
       0) exit 0 ;;
       *) warn "Неверный пункт."; sleep 1 ;;
     esac
