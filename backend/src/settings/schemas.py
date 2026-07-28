@@ -55,9 +55,11 @@ class RemnawaveSettingsResponse(BaseModel):
 
 
 class RemnawaveSettingsUpdate(BaseModel):
-    rw_api_url: str
+    rw_api_url: str = ""
     rw_api_token: str = ""
     rw_caddy_token: str = ""
+    clear_api_token: bool = False
+    clear_caddy_token: bool = False
 
 
 class RemnawaveConnectionResult(BaseModel):

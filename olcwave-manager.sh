@@ -89,11 +89,75 @@ backup_configs() {
   local backup_dir="$APP_DIR/backups/config-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$backup_dir"
 
-  for file in backend/.env frontend/.env caddy/Caddyfile; do
+  for file in backend/.env frontend/.env subscriptionPage/.env caddy/Caddyfile; do
     [[ -f "$file" ]] && cp --parents "$file" "$backup_dir/"
   done
 
   success "Резервная копия конфигов: $backup_dir"
+}
+
+restore_latest_configs() {
+  local latest_backup
+
+  latest_backup="$(
+    find "$APP_DIR/backups" \
+      -maxdepth 1 \
+      -type d \
+      -name 'config-*' \
+      | sort \
+      | tail -n1
+  )"
+
+  [[ -n "$latest_backup" ]] || {
+    warn "Резервная копия конфигов не найдена."
+    return 0
+  }
+
+  for file in backend/.env frontend/.env subscriptionPage/.env caddy/Caddyfile; do
+    if [[ -f "$latest_backup/$file" ]]; then
+      mkdir -p "$(dirname "$APP_DIR/$file")"
+      cp "$latest_backup/$file" "$APP_DIR/$file"
+    fi
+  done
+
+  success "Конфиги восстановлены из $latest_backup"
+}
+
+update_manager_command() {
+  local source="$APP_DIR/olcwave-manager.sh"
+  local target="/usr/local/bin/olcwave-manager"
+
+  [[ -f "$source" ]] || {
+    warn "Файл $source не найден."
+    return 0
+  }
+
+  install -m 755 "$source" "$target"
+  success "Команда olcwave-manager обновлена."
+}
+
+ensure_caddyfile() {
+  local template="$APP_DIR/caddy/Caddyfile.template"
+
+  if [[ -f "$CADDYFILE" ]]; then
+    return 0
+  fi
+
+  if [[ -d "$CADDYFILE" ]]; then
+    warn "$CADDYFILE является каталогом. Удаляю его."
+    rm -rf "$CADDYFILE"
+  fi
+
+  [[ -f "$template" ]] || {
+    error "Не найден шаблон $template"
+    return 1
+  }
+
+  warn "Caddyfile отсутствует."
+  warn "Автоматически создать его без доменов невозможно."
+  warn "Запустите install.sh либо восстановите Caddyfile из backup."
+
+  return 1
 }
 
 build_node_project() {
@@ -200,8 +264,15 @@ update_panel() {
 
     # Удаляем неотслеживаемые файлы и каталоги.
     # Каталог backups сохраняем.
-    git clean -fd -e backups/
+    git clean -fd \
+        -e backups/ \
+        -e backend/.env \
+        -e frontend/.env \
+        -e subscriptionPage/.env \
+        -e caddy/Caddyfile
   fi
+
+  update_manager_command
 
   # Фронтенд собирается вне Docker и затем раздаётся Caddy.
   build_node_project frontend "панели"
@@ -237,13 +308,23 @@ edit_caddy() {
 
 # Проверяет Caddyfile и перезапускает Caddy.
 apply_caddy_config() {
+  local caddy
+
+  caddy="$(find_service caddy)"
+  [[ -n "$caddy" ]] || {
+    error "Сервис Caddy не найден."
+    return 1
+  }
+
+  [[ -f "$CADDYFILE" ]] || {
+    error "Файл $CADDYFILE не найден."
+    return 1
+  }
+
   info "Проверка конфигурации Caddy..."
 
-  # Проверяем Caddyfile во временном контейнере.
-  # Это работает, даже если основной контейнер Caddy остановлен
-  # или находится в цикле перезапуска.
   if ! docker compose run --rm --no-deps \
-    caddy \
+    "$caddy" \
     caddy validate --config /etc/caddy/Caddyfile; then
 
     error "Конфигурация Caddy содержит ошибку."
@@ -254,17 +335,16 @@ apply_caddy_config() {
   success "Конфигурация Caddy корректна."
 
   info "Перезапуск Caddy..."
-  docker compose up -d --force-recreate caddy
+  docker compose up -d --force-recreate "$caddy"
 
-  # Даём контейнеру несколько секунд на запуск.
   sleep 3
 
-  if docker compose ps --status running caddy | grep -q caddy; then
+  if docker compose ps --status running "$caddy" | grep -q "$caddy"; then
     success "Caddy успешно запущен."
   else
     error "Caddy не смог запуститься."
     echo
-    docker compose logs --tail=100 caddy
+    docker compose logs --tail=100 "$caddy"
     return 1
   fi
 }
@@ -308,6 +388,7 @@ set_managed_tls_block() {
 
 # Автоматический публичный сертификат.
 set_caddy_tls_auto() {
+  ensure_caddyfile || return 1
   backup_configs
 
   # Убираем созданные менеджером TLS-настройки.
@@ -317,9 +398,9 @@ set_caddy_tls_auto() {
   apply_caddy_config
 }
 
-
 # Принудительно использовать Let's Encrypt.
 set_caddy_tls_letsencrypt() {
+  ensure_caddyfile || return 1
   backup_configs
   remove_managed_tls_block
 
@@ -331,9 +412,9 @@ set_caddy_tls_letsencrypt() {
   apply_caddy_config
 }
 
-
 # Использовать внутренний самоподписанный сертификат Caddy.
 set_caddy_tls_internal() {
+  ensure_caddyfile || return 1
   backup_configs
   remove_managed_tls_block
 
@@ -350,6 +431,11 @@ set_caddy_tls_internal() {
 
 # Подменю управления Caddy.
 caddy_menu() {
+  local caddy
+  ensure_caddyfile || {
+    pause
+    return 1
+   }
   while true; do
     clear
 
@@ -379,14 +465,19 @@ caddy_menu() {
         set_caddy_tls_internal
         ;;
       4)
-        edit_caddyfile
+        edit_caddy
         ;;
       5)
-        docker compose restart caddy
-        success "Caddy перезапущен."
+        restart_service "Caddy" "caddy"
         ;;
       6)
-        docker compose logs -f --tail=100 caddy
+        caddy="$(find_service caddy)"
+
+        if [[ -z "$caddy" ]]; then
+          warn "Сервис Caddy не найден."
+        else
+          docker compose logs -f --tail=100 "$caddy"
+        fi
         ;;
       0)
         return 0

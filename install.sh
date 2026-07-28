@@ -258,11 +258,16 @@ collect_input() {
   info "Configuration - answer the prompts below."
   printf '\n' > /dev/tty
 
-  ask_required RW_DOMAIN "Remnawave domain (e.g. remnawave.example.com)"
-  RW_API_URL="https://${RW_DOMAIN}"
+  ask RW_DOMAIN "Remnawave domain (leave blank to configure later in panel)" ""
 
-  ask_required RW_API_TOKEN "Remnawave API token"
-  ask RW_CADDY_TOKEN "Caddy Auth token (Leave blank if you dont use it)" ""
+  if [ -n "$RW_DOMAIN" ]; then
+    RW_API_URL="https://${RW_DOMAIN}"
+  else
+    RW_API_URL=""
+  fi
+
+  ask RW_API_TOKEN "Remnawave API token (leave blank to configure later)" ""
+  ask RW_CADDY_TOKEN "Caddy Auth token (leave blank if unused)" ""
 
   ask ADMIN_USERNAME "Admin username" "admin"
 
@@ -303,7 +308,7 @@ write_backend_env() {
   # printf '%s' keeps values verbatim (safe for passwords with special chars).
   {
     printf 'RW_API_URL=%s\n'                 "$RW_API_URL"
-    printf 'RW_API_TOKEN=%s\n\n'             "$RW_API_TOKEN"
+    printf 'RW_API_TOKEN=%s\n'               "$RW_API_TOKEN"
     printf 'RW_CADDY_TOKEN=%s\n\n'           "$RW_CADDY_TOKEN"
     printf 'DB_HOST=postgres\n'
     printf 'DB_PORT=5432\n'
@@ -431,7 +436,21 @@ verify_stack() {
 }
 
 # ---------------------------------------------------------------------------
-# 8. Final summary
+# 8. Install OLCWave-manager
+# ---------------------------------------------------------------------------
+install_manager() {
+  local source="$PWD/olcwave-manager.sh"
+  local target="/usr/local/bin/olcwave-manager"
+
+  [ -f "$source" ] || die "$source not found."
+
+  install -m 755 "$source" "$target"
+
+  success "Installed manager command: olcwave-manager"
+}
+
+# ---------------------------------------------------------------------------
+# 9. Final summary
 # ---------------------------------------------------------------------------
 print_summary() {
   local line="========================================"
@@ -441,6 +460,7 @@ print_summary() {
   printf '  Admin username\n    %s\n\n'        "$ADMIN_USERNAME"
   printf '  Admin password\n    %s\n\n'        "$ADMIN_PASSWORD"
   printf '  Subscription template\n    %s\n\n' "$SUB_URL_TEMPLATE"
+  printf '  Manager: run %solcwave-manager%s to manage OLCWave\n\n' "$C_BOLD" "$C_RESET"
   printf '  Containers\n    docker compose ps\n\n'
   printf '  API logs\n    docker compose logs -f api\n\n'
   printf '%s%s%s\n\n' "$C_GREEN" "$line" "$C_RESET"
@@ -464,6 +484,7 @@ main() {
   build_xraycore
   start_stack
   verify_stack
+  install_manager
   print_summary
 }
 

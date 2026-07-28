@@ -138,13 +138,13 @@ export default function Settings() {
                 queryKey: ['settings', 'remnawave'],
             })
 
-            success('Настройки Remnawave сохранены')
+            success(t('remnawaveSettingsSaved'))
         },
         onError: (err) => {
             toastError(
                 (err as { response?: { data?: { detail?: string } } })
                     ?.response?.data?.detail ||
-                'Не удалось сохранить настройки Remnawave',
+                t('failedToSaveRemnawaveSettings'),
             )
         },
     })
@@ -169,7 +169,7 @@ export default function Settings() {
             toastError(
                 (err as { response?: { data?: { detail?: string } } })
                     ?.response?.data?.detail ||
-                'Не удалось проверить подключение',
+                t('failedToTestConnection'),
             )
         },
     })
@@ -205,6 +205,8 @@ export default function Settings() {
             rw_api_url: rwApiUrl,
             rw_api_token: rwApiToken,
             rw_caddy_token: rwCaddyToken,
+            clear_api_token: false,
+            clear_caddy_token: false,
         })
     }
 
@@ -213,6 +215,28 @@ export default function Settings() {
             rw_api_url: rwApiUrl,
             rw_api_token: rwApiToken,
             rw_caddy_token: rwCaddyToken,
+            clear_api_token: false,
+            clear_caddy_token: false,
+        })
+    }
+
+    const handleClearApiToken = () => {
+        saveRemnawaveMutation.mutate({
+            rw_api_url: rwApiUrl,
+            rw_api_token: '',
+            rw_caddy_token: '',
+            clear_api_token: true,
+            clear_caddy_token: false,
+        })
+    }
+
+    const handleClearCaddyToken = () => {
+        saveRemnawaveMutation.mutate({
+            rw_api_url: rwApiUrl,
+            rw_api_token: '',
+            rw_caddy_token: '',
+            clear_api_token: false,
+            clear_caddy_token: true,
         })
     }
 
@@ -285,7 +309,7 @@ export default function Settings() {
                 <div className="px-5 py-4 space-y-4">
 
                     <Input
-                        label="Адрес Remnawave"
+                        label={t('remnawaveAddress')}
                         value={rwApiUrl}
                         onChange={(e) => setRwApiUrl(e.target.value)}
                         placeholder="https://remnawave.example.com"
@@ -293,36 +317,62 @@ export default function Settings() {
                     />
 
                     <Input
-                        label="API Token"
+                        label={t('apiToken')}
                         type="password"
                         value={rwApiToken}
                         onChange={(e) => setRwApiToken(e.target.value)}
-                        placeholder={rwApiTokenConfigured ? 'Токен уже настроен' : 'Введите API Token'}
+                        placeholder={
+                            rwApiTokenConfigured
+                                ? t('apiTokenConfigured')
+                                : t('apiToken')
+                        }
                         hint={
                             rwApiTokenConfigured
-                                ? 'Оставьте пустым, чтобы не менять текущий токен'
+                                ? t('leaveBlankToKeepToken')
                                 : undefined
                         }
                         disabled={isRemnawaveLoading}
                     />
+                    {rwApiTokenConfigured && (
+                        <div className="flex justify-end">
+                            <Button
+                                variant="secondary"
+                                onClick={handleClearApiToken}
+                                loading={saveRemnawaveMutation.isPending}
+                            >
+                                {t('deleteApiToken')}
+                            </Button>
+                        </div>
+                    )}
 
                     <Input
-                        label="Caddy Auth Token"
+                        label={t('caddyAuthToken')}
                         type="password"
                         value={rwCaddyToken}
                         onChange={(e) => setRwCaddyToken(e.target.value)}
                         placeholder={
                             rwCaddyTokenConfigured
-                                ? 'Caddy Token уже настроен'
-                                : 'Оставьте пустым, если Caddy Auth не используется'
+                                ? t('caddyTokenConfigured')
+                                : t('caddyTokenOptional')
                         }
                         hint={
                             rwCaddyTokenConfigured
-                                ? 'Оставьте пустым, чтобы не менять текущий токен'
+                                ? t('leaveBlankToKeepToken')
                                 : undefined
                         }
                         disabled={isRemnawaveLoading}
                     />
+                    {rwCaddyTokenConfigured && (
+                        <div className="flex justify-end">
+                            <Button
+                                variant="secondary"
+                                onClick={handleClearCaddyToken}
+                                loading={saveRemnawaveMutation.isPending}
+                            >
+                                {t('deleteCaddyToken')}
+                            </Button>
+                        </div>
+                    )}
                     <Select
                         label={t('autoSyncUsers')}
                         options={RW_SYNC_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
@@ -356,7 +406,7 @@ export default function Settings() {
                                 !rwApiUrl
                             }
                         >
-                            Проверить подключение
+                            {t('testConnection')}
                         </Button>
 
                         <Button
@@ -368,7 +418,7 @@ export default function Settings() {
                                 !rwApiUrl
                             }
                         >
-                            Сохранить подключение
+                            {t('saveConnection')}
                         </Button>
                     </div>
                 </div>

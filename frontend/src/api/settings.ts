@@ -19,6 +19,8 @@ export interface RemnawaveSettingsUpdate {
     rw_api_url: string
     rw_api_token: string
     rw_caddy_token: string
+    clear_api_token: boolean
+    clear_caddy_token: boolean
 }
 
 export interface RemnawaveConnectionResult {

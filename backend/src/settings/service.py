@@ -29,11 +29,17 @@ class SettingsService:
 
         changed = False
 
-        if not SettingsService._settings.rw_api_url:
-            SettingsService._settings.rw_api_url = env_settings.RW_API_URL
+        if (
+            env_settings.RW_API_URL
+            and not SettingsService._settings.rw_api_url
+        ):
+            SettingsService._settings.rw_api_url = env_settings.RW_API_URL.rstrip("/")
             changed = True
 
-        if not SettingsService._settings.rw_api_token_encrypted:
+        if (
+            env_settings.RW_API_TOKEN
+            and not SettingsService._settings.rw_api_token_encrypted
+        ):
             SettingsService._settings.rw_api_token_encrypted = encrypt_value(
                 env_settings.RW_API_TOKEN
             )
@@ -75,16 +81,24 @@ class SettingsService:
         rw_api_url: str,
         rw_api_token: str = "",
         rw_caddy_token: str = "",
+        clear_api_token: bool = False,
+        clear_caddy_token: bool = False,
     ):
         current = SettingsService.get()
 
-        current.rw_api_url = rw_api_url.rstrip("/")
+        current.rw_api_url = rw_api_url.strip().rstrip("/")
 
-        if rw_api_token:
-            current.rw_api_token_encrypted = encrypt_value(rw_api_token)
+        if clear_api_token:
+            current.rw_api_token_encrypted = ""
+        elif rw_api_token:
+            current.rw_api_token_encrypted = encrypt_value(rw_api_token.strip())
 
-        if rw_caddy_token:
-            current.rw_caddy_token_encrypted = encrypt_value(rw_caddy_token)
+        if clear_caddy_token:
+            current.rw_caddy_token_encrypted = ""
+        elif rw_caddy_token:
+            current.rw_caddy_token_encrypted = encrypt_value(
+                rw_caddy_token.strip()
+            )
 
         await SettingsService.set(current)
 
