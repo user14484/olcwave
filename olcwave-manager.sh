@@ -98,13 +98,61 @@ find_service() {
   docker compose config --services 2>/dev/null | grep -Ei "^${pattern}$|${pattern}" | head -n1 || true
 }
 
-restart_service() {
-  local title="$1" pattern="$2" service
-  service="$(find_service "$pattern")"
-  [[ -n "$service" ]] || { warn "Сервис '$pattern' не найден."; return 1; }
+select_olcrtc_container() {
+  local containers
+  mapfile -t containers < <(docker ps -a --filter ancestor=olcrtc --format '{{.Names}}')
 
-  info "Перезапуск $title ($service)..."
-  docker compose restart "$service"
+  if [[ ${#containers[@]} -eq 0 ]]; then
+    echo ""
+    return 0
+  elif [[ ${#containers[@]} -eq 1 ]]; then
+    echo "${containers[0]}"
+    return 0
+  fi
+
+  echo -e "\n${C_WHITE}Найдены следующие контейнеры OLCRTC:${C_RESET}" >&2
+  local i=1
+  for c in "${containers[@]}"; do
+    echo -e "   ${C_WHITE}$i)${C_RESET} $c" >&2
+    ((i++))
+  done
+  echo -e "   ${C_GRAY}0)${C_RESET} Отмена" >&2
+  echo >&2
+
+  local choice
+  read -r -p "$(echo -e "${C_WHITE}Выберите контейнер [0-$((${#containers[@]}))]: ${C_RESET}")" choice >&2
+
+  if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice > 0 && choice <= ${#containers[@]} )); then
+    echo "${containers[$((choice-1))]}"
+  else
+    echo ""
+  fi
+}
+
+restart_service() {
+  local title="$1" pattern="$2" is_compose="${3:-true}" service
+  
+  if [[ "$is_compose" == true ]]; then
+    service="$(find_service "$pattern")"
+    [[ -n "$service" ]] || { warn "Сервис '$pattern' не найден в Compose."; return 1; }
+    info "Перезапуск $title ($service)..."
+    docker compose restart "$service"
+  else
+    if [[ "$pattern" == "olcrtc" ]]; then
+      service="$(select_olcrtc_container)"
+      [[ -n "$service" ]] || { warn "Операция отменена или контейнеры OLCRTC не найдены."; return 1; }
+    else
+      service="$(docker ps -a --filter "name=^${pattern}$" --format '{{.Names}}' | head -n1)"
+      if [[ -z "$service" ]]; then
+        service="$(docker ps -a --filter "ancestor=$pattern" --format '{{.Names}}' | head -n1)"
+      fi
+      [[ -n "$service" ]] || { warn "Контейнер для '$title' не найден."; return 1; }
+    fi
+    
+    info "Перезапуск $title ($service)..."
+    docker restart "$service"
+  fi
+  
   success "$title перезапущен."
 }
 
@@ -121,12 +169,12 @@ restart_all() {
 }
 
 show_logs() {
-  local service
+  local service is_compose=true
   clear
   echo -e "${C_WHITE}📋 Просмотр логов${C_RESET}"
   draw_line
   echo
-  echo -e "   ${C_WHITE}1)${C_RESET} 🌍 Все сервисы"
+  echo -e "   ${C_WHITE}1)${C_RESET} 🌍 Все сервисы (только Compose)"
   echo -e "   ${C_WHITE}2)${C_RESET} ⚙️  API/backend"
   echo -e "   ${C_WHITE}3)${C_RESET} 🌐 Caddy"
   echo -e "   ${C_WHITE}4)${C_RESET} 🛡️  XrayCore"
@@ -136,20 +184,27 @@ show_logs() {
   read -r -p "$(echo -e "${C_WHITE}Выберите логи [0-5]: ${C_RESET}")" choice
 
   case "$choice" in
-    1) docker compose logs -f --tail=150 ;;
+    1) docker compose logs -f --tail=150; return 0 ;;
     2) service="$(find_service 'api|backend')" ;;
     3) service="$(find_service caddy)" ;;
-    4) service="$(find_service xray)" ;;
-    5) service="$(find_service olcrtc)" ;;
+    4) service="olcwave-xraycore"; is_compose=false ;;
+    5) 
+       service="$(select_olcrtc_container)"
+       [[ -n "$service" ]] || { warn "Операция отменена или контейнеры OLCRTC не найдены."; return 1; }
+       is_compose=false 
+       ;;
     0) return 0 ;;
     *) warn "Неверный пункт."; return 0 ;;
   esac
 
-  [[ "$choice" == 1 ]] && return 0
-  [[ -n "${service:-}" ]] || { warn "Сервис не найден."; return 1; }
-  docker compose logs -f --tail=150 "$service"
+  if [[ "$is_compose" == true ]]; then
+    [[ -n "${service:-}" ]] || { warn "Сервис не найден в Compose."; return 1; }
+    docker compose logs -f --tail=150 "$service"
+  else
+    [[ -n "${service:-}" ]] || { warn "Контейнер не найден."; return 1; }
+    docker logs -f --tail=150 "$service"
+  fi
 }
-
 # ---------------------------------------------------------------------------
 # Обновления и бэкапы
 # ---------------------------------------------------------------------------
@@ -556,8 +611,8 @@ main() {
       3) switch_branch; pause ;;
       4) restart_all; pause ;;
       5) restart_service "API/backend" 'api|backend'; pause ;;
-      6) restart_service "XrayCore" 'xray'; pause ;;
-      7) restart_service "OLCRTC" 'olcrtc'; pause ;;
+      6) restart_service "XrayCore" 'olcwave-xraycore' false; pause ;;
+      7) restart_service "OLCRTC" 'olcrtc' false; pause ;;
       8) caddy_menu ;;
       9) show_logs || true; pause ;;
       0) exit 0 ;;
