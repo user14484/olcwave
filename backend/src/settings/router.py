@@ -33,6 +33,19 @@ def format_connection_error(exc: Exception) -> str:
 
     return "Не удалось проверить подключение."
 
+def normalize_token_input(value: str) -> str:
+    value = value.strip()
+
+    if not value:
+        return ""
+
+    mask_chars = {"•", "●", "·", "*", "∙"}
+
+    if all(char in mask_chars for char in value):
+        return ""
+
+    return value
+
 @router.get("/")
 async def get_settings(_admin: dict = Depends(get_current_admin)):
     current = SettingsService.get()
@@ -107,9 +120,13 @@ async def test_remnawave_settings(
         SettingsService.get_remnawave_credentials()
     )
 
-    api_url = data.rw_api_url.rstrip("/") or current_url
-    api_token = data.rw_api_token or current_api_token
-    caddy_token = data.rw_caddy_token or current_caddy_token
+    api_url = data.rw_api_url.strip().rstrip("/") or current_url
+
+    submitted_api_token = normalize_token_input(data.rw_api_token)
+    submitted_caddy_token = normalize_token_input(data.rw_caddy_token)
+
+    api_token = submitted_api_token or current_api_token
+    caddy_token = submitted_caddy_token or current_caddy_token
 
     try:
         client = RemnawaveSDK(
@@ -152,10 +169,30 @@ async def test_remnawave_settings(
         except Exception as exc:
             caddy_result = RemnawaveConnectionResult(
                 success=False,
-                message=format_connection_error(exc),
+                message=format_caddy_connection_error(exc),
             )
 
     return RemnawaveTestResponse(
         remnawave=remnawave_result,
         caddy=caddy_result,
     )
+
+def format_caddy_connection_error(exc: Exception) -> str:
+    message = str(exc).lower()
+
+    if "401" in message or "unauthorized" in message:
+        return "Не удалось авторизоваться. Проверьте Caddy Auth Token."
+
+    if "403" in message or "forbidden" in message:
+        return "Caddy Auth отклонил запрос. Проверьте права токена."
+
+    if "404" in message or "not found" in message:
+        return "Endpoint настроек подписок не найден."
+
+    if "timeout" in message or "timed out" in message:
+        return "Сервис подписок не ответил вовремя."
+
+    if "connect" in message or "connection" in message:
+        return "Не удалось подключиться к сервису подписок."
+
+    return "Не удалось проверить Caddy Auth."

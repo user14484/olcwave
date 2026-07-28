@@ -178,6 +178,8 @@ export default function Settings() {
         if (!remnawaveSettings) return
 
         setRwApiUrl(remnawaveSettings.rw_api_url)
+        setRwApiToken('')
+        setRwCaddyToken('')
         setRwApiTokenConfigured(remnawaveSettings.rw_api_token_configured)
         setRwCaddyTokenConfigured(remnawaveSettings.rw_caddy_token_configured)
     }, [remnawaveSettings])
@@ -319,6 +321,11 @@ export default function Settings() {
                     <Input
                         label={t('apiToken')}
                         type="password"
+                        autoComplete="new-password"
+                        name="remnawave-api-token"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
                         value={rwApiToken}
                         onChange={(e) => setRwApiToken(e.target.value)}
                         placeholder={
@@ -348,6 +355,11 @@ export default function Settings() {
                     <Input
                         label={t('caddyAuthToken')}
                         type="password"
+                        autoComplete="new-password"
+                        name="remnawave-caddy-token"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
                         value={rwCaddyToken}
                         onChange={(e) => setRwCaddyToken(e.target.value)}
                         placeholder={
